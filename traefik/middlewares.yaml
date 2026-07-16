@@ -1,0 +1,156 @@
+http:
+  middlewares:
+    # --- Auth Middleware ---
+    forward-auth:
+      forwardAuth:
+        address: "http://am-auth-tokens.am-apps-preprod.svc.cluster.local:8001/api/v1/validate/me"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - X-User-ID
+          - X-Username
+          - X-Email
+          - X-Roles
+    # --- Security & CORS ---
+    global-cors:
+      headers:
+        accessControlAllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "OPTIONS"
+          - "PATCH"
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList:
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+    # --- Routing Rewriters ---
+    rewrite-users:
+      replacePathRegex:
+        regex: "^/users/(.*)"
+        replacement: "/api/$1"
+    rewrite-auth:
+      replacePathRegex:
+        regex: "^/auth/(.*)"
+        replacement: "/api/$1"
+
+    # --- UI Strippers ---
+    strip-diagnostic:
+      stripPrefix:
+        prefixes: ["/diagnostic"]
+    strip-market-ui:
+      stripPrefix:
+        prefixes: ["/market-ui"]
+    strip-trade-ui:
+      stripPrefix:
+        prefixes: ["/trade-ui"]
+    strip-doc-ui:
+      stripPrefix:
+        prefixes: ["/doc-ui"]
+    strip-portfolio-ui:
+      stripPrefix:
+        prefixes: ["/portfolio-ui"]
+    strip-ai-bots-ui:
+      stripPrefix:
+        prefixes: ["/ai-bots-ui"]
+    strip-kafka-ui:
+      stripPrefix:
+        prefixes: ["/kafka-ui"]
+    strip-terraform-rover:
+      stripPrefix:
+        prefixes: ["/terraform/rover"]
+    strip-traefik-dashboard:
+      stripPrefix:
+        prefixes: ["/traefik/dashboard"]
+    strip-prometheus:
+      stripPrefix:
+        prefixes: ["/prometheus"]
+    strip-grafana:
+      stripPrefix:
+        prefixes: ["/grafana"]
+    strip-loki:
+      stripPrefix:
+        prefixes: ["/loki"]
+    strip-vault:
+      stripPrefix:
+        prefixes: ["/vault"]
+    strip-headlamp:
+      stripPrefix:
+        prefixes: ["/headlamp"]
+
+    # --- Cache Control ---
+    vary-referer:
+      headers:
+        customResponseHeaders:
+          Vary: "Referer"
+          Cache-Control: "no-cache" # Force revalidation
+
+    # --- API Strippers (Rewriters) ---
+    strip-api-auth:
+      stripPrefix:
+        prefixes: ["/api/auth"]
+    strip-api-users:
+      stripPrefix:
+        prefixes: ["/api/users"]
+
+    strip-api-internal-python:
+      replacePathRegex:
+        regex: "^/api/internal/python/(.*)"
+        replacement: "/api/$1"
+    strip-api-internal-java:
+      replacePathRegex:
+        regex: "^/api/internal/java/(.*)"
+        replacement: "/api/$1"
+
+    strip-api-market:
+      stripPrefix:
+        prefixes: ["/api/market"]
+
+    strip-api-etf:
+      stripPrefix:
+        prefixes: ["/api/etf"]
+
+    strip-api-jobs:
+      stripPrefix:
+        prefixes: ["/api/jobs"]
+
+    strip-api-market-processor:
+      stripPrefix:
+        prefixes: ["/api/market/processor"]
+
+    strip-api-trade:
+      stripPrefix:
+        prefixes: ["/api/trade"]
+
+    strip-api-trade-processor:
+      stripPrefix:
+        prefixes: ["/api/trade/processor"]
+
+    strip-api-portfolio:
+      stripPrefix:
+        prefixes: ["/api/portfolio"]
+
+    strip-api-doc:
+      replacePathRegex:
+        regex: "^/api/doc/(.*)"
+        replacement: "/api/$1"
+    strip-api-doc-processor:
+      replacePathRegex:
+        regex: "^/api/doc/processor/(.*)"
+        replacement: "/api/$1"
+
+    strip-api-ai:
+      replacePathRegex:
+        regex: "^/api/ai/(.*)"
+        replacement: "/api/$1"
+    strip-api-ai-analytics:
+      replacePathRegex:
+        regex: "^/api/ai/analytics/(.*)"
+        replacement: "/api/$1"
+
+    strip-api-market-analysis:
+      replacePathRegex:
+        regex: "^/api/market/analysis/(.*)"
+        replacement: "/api/$1"

@@ -1,0 +1,121 @@
+# ==============================================================================
+# am-infra .gitignore
+# ==============================================================================
+
+# ── Credentials & Secrets ─────────────────────────────────────────────────────
+infrastructure-secrets/
+generated-credentials.txt
+*.env
+.env
+.env.*
+.env.infra
+.env.docker
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+changes.txt
+
+# ── Terraform ─────────────────────────────────────────────────────────────────
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+state.json
+viz-state.json
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# ── Executables & Binaries ────────────────────────────────────────────────────
+*.exe
+*.dll
+*.so
+*.dylib
+*.out
+
+# ── Logs & Temp ───────────────────────────────────────────────────────────────
+*.log
+logs/
+tmp/
+temp/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── OS & Editor Files ─────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── Node.js ───────────────────────────────────────────────────────────────────
+node_modules/
+package-lock.json
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# ── Kubernetes Runtime ────────────────────────────────────────────────────────
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+
+# Vault runtime keys
+vault-keys.json
+vault-keys-utf8.json
+vault-credentials.txt
+helm.zip
+helm-extracted/
+
+# Zip archives
+*.zip
+
+# Infrastructure Credentials & Runner
+.env
+actions-runner/
+runner/.kube/
+.kube/
+config.sh
+config.cmd
+
+# --- Variable Files (Professional Guard) ---
+*.tfvars
+*.tfvars.json
+
+# Kubernetes Runtime
+terraform/environments/local/kubeconfig.yaml
+terraform/foundation/am-local-config
+
+# Scratches & Backups
+terraform/scratch_*.py
+**/*.bak
+**/*.backup
+
+# High-risk exported state & plans
+terraform/*-utf8.json
+terraform/tfplan
+terraform/current_state_list*.txt
+
+# Local/Secret Files copied from am-infra
+keys.json
+MONGO_RESTORED_PASSWORD.txt
+_legacy_backup/

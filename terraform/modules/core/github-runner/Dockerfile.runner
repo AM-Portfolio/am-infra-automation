@@ -1,0 +1,25 @@
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y curl jq git wget tar unzip apt-transport-https ca-certificates sudo libicu-dev gnupg software-properties-common lsb-release && rm -rf /var/lib/apt/lists/*
+
+# Terraform
+RUN curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list && apt-get update && apt-get install -y terraform && rm -rf /var/lib/apt/lists/*
+
+# Helm
+RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && rm get_helm.sh
+
+# kubectl
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && chmod +x kubectl && mv kubectl /usr/local/bin/
+
+# Runner user
+RUN useradd -m github && usermod -aG sudo github && echo "github ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER github
+WORKDIR /home/github
+
+ARG RUNNER_VERSION="2.333.1"
+RUN mkdir actions-runner && cd actions-runner && curl -o "actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" -L "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" && tar xzf "./actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" && rm "actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+
+COPY start.sh /home/github/start.sh
+CMD ["/bin/bash", "/home/github/start.sh"]

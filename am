@@ -1,0 +1,3 @@
+#!/bin/bash
+# 🌌 AM-Enterprise Infrastructure CLI (ami)
+node "$(dirname "$0")/scripts/orchestration/manage.js" "$@"

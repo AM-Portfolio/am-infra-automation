@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://127.0.0.1:6443
+    insecure-skip-tls-verify: true
+  name: kind-am-preprod
+contexts:
+- context:
+    cluster: kind-am-preprod
+    user: am-admin
+  name: kind-am-preprod
+current-context: kind-am-preprod
+users:
+- name: am-admin
+  user:
+    token: eyJhbGciOiJSUzI1NiIsImtpZCI6IlZFNzgyT2Z0NjgxNU9SdWdOVFR5WDdaYVNtUi00X2pXMzNMU2ZHLVZMQ0kifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWwiXSwiZXhwIjoxNzc5MTI5MjgyLCJpYXQiOjE3NzkwNDI4ODIsImlzcyI6Imh0dHBzOi8va3ViZXJuZXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwia3ViZXJuZXRlcy5pbyI6eyJuYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsInNlcnZpY2VhY2NvdW50Ijp7Im5hbWUiOiJhbS1hZG1pbiIsInVpZCI6ImFmMDRjNjViLTM3YTMtNGNkOS05NzJiLTQ2YmU0MWMxYzgxNCJ9fSwibmJmIjoxNzc5MDQyODgyLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZS1zeXN0ZW06YW0tYWRtaW4ifQ.GziaSRVm4xbQQpb762Vnh1l9n4ECRXIxtjBBx5YQOwCWWu-YLIAdAtKz04Wjqn1YFlvXiX4MuchXbTXdO6MwjrTCQTJK6aTPcuSpsRZc-Gyu3FyIe6zCnDHfaxbGBqkaB0FZHjyW7EExT9zVtiUeJLurHfHpfzlDQKMrs0hnBavRtfGR_AQheppFBVG5W8Rv010Zf4qIgT68wvfvvxvOWNyzQmbMpozgTHidZ5_swBYjIWvZl-tYi32cQVA9G-6oTBi2T2hBtVw0MfVs4-9TxY1TfVlValMxo16GfFmigX145NVuCZmi6HIJp6IRiJ_v2NW77jxbE-FWS6wbMOti5A

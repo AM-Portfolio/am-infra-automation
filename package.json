@@ -1,0 +1,83 @@
+{
+  "name": "am-infrastructure",
+  "version": "1.0.0",
+  "description": "Modular Infrastructure Orchestrator for AM-Ecosystem",
+  "main": "scripts/orchestration/manage.js",
+  "scripts": {
+    "_pipeline_": "=== VAULT-FIRST PIPELINE: foundation → vault → admin → gateway → identity → data-stores → monitoring → platform ===",
+
+    "foundation:init":     "node scripts/orchestration/manage.js init    -p foundation",
+    "foundation:plan":     "node scripts/orchestration/manage.js plan    -p foundation",
+    "foundation:apply":    "node scripts/orchestration/manage.js apply   -p foundation",
+    "foundation:destroy":  "node scripts/orchestration/manage.js destroy -p foundation",
+
+    "vault:init":          "node scripts/orchestration/manage.js init    -p vault",
+    "vault:plan":          "node scripts/orchestration/manage.js plan    -p vault",
+    "vault:apply":         "node scripts/orchestration/manage.js apply   -p vault",
+    "vault:destroy":       "node scripts/orchestration/manage.js destroy -p vault",
+
+    "admin:init":          "node scripts/orchestration/manage.js init    -p admin",
+    "admin:plan":          "node scripts/orchestration/manage.js plan    -p admin",
+    "admin:apply":         "node scripts/orchestration/manage.js apply   -p admin",
+    "admin:destroy":       "node scripts/orchestration/manage.js destroy -p admin",
+
+    "gateway:init":        "node scripts/orchestration/manage.js init    -p gateway",
+    "gateway:plan":        "node scripts/orchestration/manage.js plan    -p gateway",
+    "gateway:apply":       "node scripts/orchestration/manage.js apply   -p gateway",
+    "gateway:destroy":     "node scripts/orchestration/manage.js destroy -p gateway",
+    "gateway:state-rm":    "node scripts/orchestration/manage.js state rm -p gateway",
+
+    "identity:init":       "node scripts/orchestration/manage.js init    -p identity",
+    "identity:plan":       "node scripts/orchestration/manage.js plan    -p identity",
+    "identity:apply":      "node scripts/orchestration/manage.js apply   -p identity",
+    "identity:destroy":    "node scripts/orchestration/manage.js destroy -p identity",
+
+    "access:init":         "node scripts/orchestration/manage.js init    -p access",
+    "access:plan":         "node scripts/orchestration/manage.js plan    -p access",
+    "access:apply":        "node scripts/orchestration/manage.js apply   -p access",
+    "access:destroy":      "node scripts/orchestration/manage.js destroy -p access",
+
+    "data-stores:init":    "node scripts/orchestration/manage.js init    -p data-stores",
+    "data-stores:plan":    "node scripts/orchestration/manage.js plan    -p data-stores",
+    "data-stores:apply":   "node scripts/orchestration/manage.js apply   -p data-stores",
+    "data-stores:destroy": "node scripts/orchestration/manage.js destroy -p data-stores",
+
+    "monitoring":          "node scripts/orchestration/manage.js apply   -p monitoring",
+    "monitoring:init":     "node scripts/orchestration/manage.js init    -p monitoring",
+    "monitoring:plan":     "node scripts/orchestration/manage.js plan    -p monitoring",
+    "monitoring:apply":    "node scripts/orchestration/manage.js apply   -p monitoring",
+    "monitoring:destroy":  "node scripts/orchestration/manage.js destroy -p monitoring",
+
+    "platform:init":       "node scripts/orchestration/manage.js init    -p platform",
+    "platform:plan":       "node scripts/orchestration/manage.js plan    -p platform",
+    "platform:apply":      "node scripts/orchestration/manage.js apply   -p platform",
+    "platform:destroy":    "node scripts/orchestration/manage.js destroy -p platform",
+
+    "exposer:init":        "node scripts/orchestration/manage.js init    -p exposer",
+    "exposer:plan":        "node scripts/orchestration/manage.js plan    -p exposer",
+    "exposer:apply":       "node scripts/orchestration/manage.js apply   -p exposer",
+    "exposer:destroy":     "node scripts/orchestration/manage.js destroy -p exposer",
+
+    "_preprod_": "=== PREPROD (VPS) EQUIVALENTS ===",
+    "vps:foundation:apply":   "node scripts/orchestration/manage.js apply -p foundation  -e preprod",
+    "vps:vault:apply":        "node scripts/orchestration/manage.js apply -p vault       -e preprod",
+    "vps:gateway:apply":      "node scripts/orchestration/manage.js apply -p gateway     -e preprod",
+    "vps:identity:apply":     "node scripts/orchestration/manage.js apply -p identity    -e preprod",
+    "vps:data-stores:apply":  "node scripts/orchestration/manage.js apply -p data-stores -e preprod",
+    "vps:monitoring:apply":   "node scripts/orchestration/manage.js apply -p monitoring  -e preprod",
+
+    "_utils_": "=== UTILITIES ===",
+    "factory-reset":       "node scripts/orchestration/factory_reset.js",
+    "test:connectivity":   "python scripts/diagnostics/check_connectivity.py"
+  },
+
+  "keywords": [
+    "terraform",
+    "orchestrator",
+    "infrastructure",
+    "kind",
+    "vault"
+  ],
+  "author": "Antigravity",
+  "license": "ISC"
+}
