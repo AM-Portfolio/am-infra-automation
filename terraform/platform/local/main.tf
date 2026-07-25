@@ -3,9 +3,7 @@
 # ==============================================================================
 
 terraform {
-  backend "local" {
-    path = "terraform.tfstate"
-  }
+  backend "local" {}
 }
 
 data "terraform_remote_state" "identity" {

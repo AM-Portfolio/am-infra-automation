@@ -1,7 +1,6 @@
 const { execSync } = require('child_process');
 try {
-  const out = execSync('ssh -o StrictHostKeyChecking=no root@150.242.202.122 "ls -la /data/am-repos/am-infra/terraform/foundation/preprod"');
-  console.log(out.toString());
+  execSync('ssh -p 7576 -o StrictHostKeyChecking=no root@103.127.146.57 "ls -la /data/am-repos/am-infra-automation/terraform/foundation/preprod"', { stdio: 'inherit' });
 } catch (e) {
   console.error(e.message);
 }

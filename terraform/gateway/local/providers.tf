@@ -69,10 +69,15 @@ provider "vault" {
   token   = local.vault_root_token
 }
 
+locals {
+  cf_raw_token = var.cloudflare_api_token != "" ? var.cloudflare_api_token : try(data.vault_kv_secret_v2.cloudflare_api.data["cloudflare_api_token"], "")
+  cf_token     = local.cf_raw_token != "" ? local.cf_raw_token : "dummy_cloudflare_api_token_value_for_validation"
+}
+
 # Cloudflare Provider — authenticated via Verified API Token from Vault
 # (Fallback to environment variable if Vault read fails)
 provider "cloudflare" {
-  api_token = coalesce(lookup(data.vault_kv_secret_v2.cloudflare_api.data, "cloudflare_api_token", ""), var.cloudflare_api_token)
+  api_token = local.cf_token
 }
 
 data "vault_kv_secret_v2" "cloudflare_api" {

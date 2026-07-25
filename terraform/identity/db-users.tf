@@ -33,8 +33,8 @@ module "db_users" {
   }
 
   db_admin_accounts = {
-    "munish-dba" = {
-      display_name = "Munish (DB Admin)"
+    "arvind-dba" = {
+      display_name = "Arvind (DB Admin)"
       email        = "admin@${var.root_domain}"
       databases    = ["postgresql", "mongodb", "redis", "influxdb"]
     }

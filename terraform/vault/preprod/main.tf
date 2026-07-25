@@ -21,11 +21,13 @@
 
 # ── Step 1: Deploy Vault using the existing child module ──────────────────────
 module "vault" {
-  source      = "../../modules/apps/vault"
-  root_domain = var.root_domain
-  environment = var.environment
-  namespace       = "vault"
-  infra_namespace = "infra"
+  source           = "../../modules/apps/vault"
+  root_domain      = var.root_domain
+  environment      = var.environment
+  namespace        = "vault"
+  infra_namespace  = "infra"
+  vault_unseal_key = var.vault_unseal_key
+  kubeconfig_path  = var.kubeconfig_path
 }
 
 # ── Step 2: Auto-generate fallback secrets ────────────────────────────────────
@@ -165,6 +167,67 @@ resource "vault_kv_secret_v2" "platform" {
   data_json = jsonencode({
     github_pat = local.resolved.github_pat
   })
+}
+
+resource "vault_kv_secret_v2" "admin" {
+  mount = vault_mount.secret.path
+  name  = "${var.environment}/infra/admin"
+  data_json = jsonencode({
+    headlamp_token = ""
+  })
+}
+
+# ── Step 3a: Vault Policy for automation (read OIDC creds, write token)
+resource "vault_policy" "am_automation" {
+  name   = "am-automation-${var.environment}"
+  policy = <<EOT
+path "secret/data/${var.environment}/infra/authentik/automation" {
+  capabilities = ["read"]
+}
+
+path "secret/data/${var.environment}/infra/identity/automation" {
+  capabilities = ["create", "update", "read"]
+}
+EOT
+}
+
+# ── Step 3a: Enable AppRole auth backend
+resource "vault_auth_backend" "approle" {
+  path        = "approle"
+  type        = "approle"
+  description = "AppRole authentication backend"
+}
+
+
+# ── Step 3b: AppRole for automation scripts
+resource "vault_approle_auth_backend_role" "am_automation_role" {
+  depends_on = [vault_auth_backend.approle]
+  backend          = "approle"
+  role_name        = "am-automation-${var.environment}"
+  token_ttl        = 600
+  token_max_ttl    = 1800
+  token_policies   = [vault_policy.am_automation.name]
+  bind_secret_id   = true
+  secret_id_num_uses = 0
+  secret_id_ttl    = 0
+}
+
+# ── Step 3c: Generate Secret ID for automation AppRole
+resource "vault_approle_auth_backend_role_secret_id" "am_automation_secret_id" {
+  backend   = "approle"
+  role_name = vault_approle_auth_backend_role.am_automation_role.role_name
+}
+
+# ── Outputs for automation AppRole
+output "am_automation_role_id" {
+  description = "AppRole role_id for automation"
+  value       = vault_approle_auth_backend_role.am_automation_role.role_id
+}
+
+output "am_automation_secret_id" {
+  description = "AppRole secret_id for automation"
+  value       = vault_approle_auth_backend_role_secret_id.am_automation_secret_id.secret_id
+  sensitive   = true
 }
 
 # ── Outputs ───────────────────────────────────────────────────────────────────

@@ -27,9 +27,9 @@ resource "authentik_provider_oauth2" "vault_oauth2" {
   signing_key        = data.authentik_certificate_key_pair.default.id
   
   property_mappings = [
-    "547c2009-5d7c-470a-9654-076c8244502c", # openid
-    "a74ee01e-5ed3-49d6-950a-b42179e3131f", # email
-    "f6e927c8-acc9-4a9b-bb3d-2fe9d0a779f9"  # profile
+    local.openid_scope_id,
+    local.email_scope_id,
+    local.profile_scope_id
   ]
   
   redirect_uris = [
@@ -52,7 +52,7 @@ resource "vault_jwt_auth_backend" "oidc" {
   description        = "OIDC authentication via Authentik"
   path               = "oidc"
   type               = "oidc"
-  oidc_discovery_url = "https://${local.authentik_host}/application/o/vault-sso/"
+  oidc_discovery_url = "http://authentik-server.identity.svc.cluster.local:80/application/o/vault-sso/"
   oidc_client_id     = authentik_provider_oauth2.vault_oauth2.client_id
   oidc_client_secret = var.vault_oidc_client_secret
   default_role       = "default"

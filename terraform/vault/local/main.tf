@@ -21,11 +21,13 @@
 
 # ── Step 1: Deploy Vault using the existing child module ──────────────────────
 module "vault" {
-  source      = "../../modules/apps/vault"
-  root_domain = var.root_domain
-  environment = var.environment
-  namespace       = "vault"
-  infra_namespace = "infra"
+  source           = "../../modules/apps/vault"
+  root_domain      = var.root_domain
+  environment      = var.environment
+  namespace        = "vault"
+  infra_namespace  = "infra"
+  vault_unseal_key = var.vault_unseal_key
+  kubeconfig_path  = var.kubeconfig_path
 }
 
 # ── Step 2: Auto-generate fallback secrets ────────────────────────────────────
@@ -117,6 +119,37 @@ resource "vault_mount" "secret" {
   description = "Primary KV-V2 store — source of truth for all AM infrastructure secrets"
   depends_on  = [module.vault]
 }
+# ── Step 3a: Vault Policy for automation (read OIDC creds, write token) �nresource "vault_policy" "am_automation" {
+  name   = "am-automation-${var.environment}"
+  policy = <<EOT
+path "secret/data/${var.environment}/infra/authentik/automation" {
+  capabilities = ["read"]
+}
+
+path "secret/data/${var.environment}/infra/identity/automation" {
+  capabilities = ["create", "update", "read"]
+}
+EOT
+}
+
+# ── Step 3b: AppRole for automation scripts �nresource "vault_approle_auth_backend_role" "am_automation_role" {
+  backend          = "approle"
+  role_name        = "am-automation-${var.environment}"
+  token_ttl        = 600
+  token_max_ttl    = 1800
+  token_policies   = [vault_policy.am_automation.name]
+  bind_secret_id   = true
+  secret_id_num_uses = 0
+  secret_id_ttl    = "0"
+}
+
+# ── Step 3c: Generate Secret ID for automation AppRole �nresource "vault_approle_auth_backend_role_secret_id" "am_automation_secret_id" {
+  backend   = "approle"
+  role_name = vault_approle_auth_backend_role.am_automation_role.role_name
+}
+
+
+# End of automation role definition
 
 # ── Step 5: Seed secrets into Vault KV paths (environment-scoped) ────────────
 # All paths are prefixed with var.environment so local/preprod secrets never
@@ -154,8 +187,10 @@ resource "vault_kv_secret_v2" "identity" {
   mount = vault_mount.secret.path
   name  = "${var.environment}/infra/identity"
   data_json = jsonencode({
-    authentik_bootstrap_token = local.resolved.authentik_bootstrap
-    authentik_secret_key      = local.resolved.authentik_secret_key
+    authentik_bootstrap_token = local.resolved.authentik_bootstrap,
+    authentik_secret_key      = local.resolved.authentik_secret_key,
+    authentik_client_id       = var.authentik_client_id,
+    authentik_client_secret   = var.authentik_client_secret
   })
 }
 
@@ -164,6 +199,14 @@ resource "vault_kv_secret_v2" "platform" {
   name  = "${var.environment}/infra/platform"
   data_json = jsonencode({
     github_pat = local.resolved.github_pat
+  })
+}
+
+resource "vault_kv_secret_v2" "admin" {
+  mount = vault_mount.secret.path
+  name  = "${var.environment}/infra/admin"
+  data_json = jsonencode({
+    headlamp_token = ""
   })
 }
 
@@ -189,3 +232,15 @@ output "secret_resolution_summary" {
     minio_root_from_env        = var.minio_root_password != ""
   }
 }
+
+output "am_automation_role_id" {
+  description = "AppRole role_id for automation"
+  value       = vault_approle_auth_backend_role.am_automation_role.role_id
+}
+
+output "am_automation_secret_id" {
+  description = "AppRole secret_id for automation"
+  value       = vault_approle_auth_backend_role_secret_id.am_automation_secret_id.secret_id
+  sensitive   = true
+}
+

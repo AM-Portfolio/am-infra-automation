@@ -164,12 +164,13 @@ resource "kubernetes_stateful_set" "kafka" {
 # ------------------------------------------------------------------------------
 # OIDC Configuration Fetch (from Vault)
 # ------------------------------------------------------------------------------
-data "vault_generic_secret" "oidc" {
-  path = "secret/infra/oidc-data-stores"
+data "vault_kv_secret_v2" "oidc" {
+  mount = "secret"
+  name  = "${var.environment}/infra/oidc-data-stores"
 }
 
 locals {
-  oidc_data = data.vault_generic_secret.oidc.data
+  oidc_data = data.vault_kv_secret_v2.oidc.data
 
   # Kafka OIDC Configuration (Extracted for Checksum & Reuse)
   kafka_oidc_config = {

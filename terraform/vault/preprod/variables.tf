@@ -23,13 +23,13 @@ variable "environment" {
 variable "kubeconfig_path" {
   description = "Path to the kubeconfig file"
   type        = string
-  default     = "/data/am-state/am-preprod-config"
+  default     = "/Users/arvind/.kube/config"
 }
 
 variable "kubeconfig_context" {
   description = "Kubernetes context to use"
   type        = string
-  default     = "am-preprod"
+  default     = "kind-am-preprod"
 }
 
 # The root token is required only on first boot to authenticate the vault

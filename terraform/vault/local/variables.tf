@@ -155,4 +155,15 @@ variable "authentik_token" {
   sensitive = true
   default   = ""
 }
+variable "authentik_client_id" {
+  description = "Authentik client ID for automation"
+  type        = string
+  default     = ""
+}
 
+variable "authentik_client_secret" {
+  description = "Authentik client secret for automation"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

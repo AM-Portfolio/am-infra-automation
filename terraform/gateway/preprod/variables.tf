@@ -53,5 +53,5 @@ variable "kubeconfig_path" {
 variable "kubeconfig_context" {
   description = "Kubernetes context to use"
   type        = string
-  default     = "am-preprod"
+  default     = "kind-am-preprod"
 }

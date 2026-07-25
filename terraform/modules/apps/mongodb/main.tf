@@ -55,9 +55,12 @@ resource "helm_release" "mongodb" {
       rootPassword  = var.mongo_root_password
     }
     architecture = "standalone"
+    nodeSelector = {
+      role = "infra"
+    }
     image = {
-      registry   = "public.ecr.aws"
-      repository = "bitnami/mongodb"
+      registry   = "docker.io"
+      repository = "bitnamilegacy/mongodb"
       tag        = "7.0"
     }
     persistence = {
@@ -67,8 +70,9 @@ resource "helm_release" "mongodb" {
     volumePermissions = {
       enabled = true
       image = {
-        registry   = "public.ecr.aws"
-        repository = "bitnami/bitnami-shell"
+        registry   = "docker.io"
+        repository = "library/ubuntu"
+        tag        = "latest"
       }
     }
 
@@ -108,6 +112,9 @@ resource "helm_release" "mongo_express" {
     mongodbServer        = "mongodb.${var.namespace}.svc.cluster.local"
     mongodbPort          = 27017
     mongodbEnableAdmin   = true
+    nodeSelector = {
+      role = "infra"
+    }
     ingress = {
       enabled = false # Controlled by our explicit Gateway routes instead
     }

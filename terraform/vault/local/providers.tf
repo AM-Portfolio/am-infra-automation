@@ -64,8 +64,8 @@ data "kubernetes_secret" "vault_keys" {
 
 locals {
   # Fish the root token from the cluster secret; fallback to manual var if needed
-  # We use the index [0] only if the data source was actually created.
-  vault_root_token = var.vault_root_token != "" ? var.vault_root_token : (length(data.kubernetes_secret.vault_keys) > 0 ? jsondecode(data.kubernetes_secret.vault_keys[0].data["keys.json"]).root_token : "")
+  # We use try() to robustly handle when the secret is not yet created during plan phases.
+  vault_root_token = var.vault_root_token != "" ? var.vault_root_token : try(jsondecode(data.kubernetes_secret.vault_keys[0].data["keys.json"]).root_token, "")
 }
 
 # 3. Vault Provider — Authenticated for secret persistence

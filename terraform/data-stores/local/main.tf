@@ -3,15 +3,13 @@
 # ==============================================================================
 
 terraform {
-  backend "local" {
-    path = "terraform.tfstate"
-  }
+  backend "local" {}
 }
 
 data "terraform_remote_state" "foundation" {
   backend = "local"
   config = {
-    path = "../../foundation/local/terraform.tfstate"
+    path = "../../state/foundation.tfstate"
   }
 }
 

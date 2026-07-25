@@ -3,8 +3,9 @@
 # ------------------------------------------------------------------------------
 
 resource "random_password" "headlamp_client_secret" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 resource "authentik_provider_oauth2" "headlamp" {
@@ -14,11 +15,10 @@ resource "authentik_provider_oauth2" "headlamp" {
   
   authorization_flow  = data.authentik_flow.default_provider_authorization_implicit_consent.id
   
-  # Standard Authentik OIDC Scopes (UUIDs)
   property_mappings = [
-    "547c2009-5d7c-470a-9654-076c8244502c", # openid
-    "a74ee01e-5ed3-49d6-950a-b42179e3131f", # email
-    "f6e927c8-acc9-4a9b-bb3d-2fe9d0a779f9"  # profile
+    local.openid_scope_id,
+    local.email_scope_id,
+    local.profile_scope_id
   ]
 
   redirect_uris = [

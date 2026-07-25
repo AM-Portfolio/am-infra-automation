@@ -33,13 +33,15 @@ resource "helm_release" "authentik" {
 
   values = [yamlencode({
     authentik = {
-      secret_key = var.authentik_secret_key
-      env = {
-        AUTHENTIK_BOOTSTRAP_PASSWORD        = var.bootstrap_token
-        AUTHENTIK_BOOTSTRAP_TOKEN           = var.bootstrap_token
-        AUTHENTIK_FORCE_HTTPS               = "true"
-        AUTHENTIK_OIDC__ISSUER_BASE_URL     = "https://${local.authentik_hostname}/"
-        AUTHENTIK_LISTEN__TRUSTED_PROXY_IPS = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+      secret_key         = var.authentik_secret_key
+      bootstrap_password = var.bootstrap_token
+      bootstrap_token    = var.bootstrap_token
+      force_https        = true
+      oidc = {
+        issuer_base_url = "https://${local.authentik_hostname}/"
+      }
+      listen = {
+        trusted_proxy_ips = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
       }
       postgresql = {
         host     = "authentik-postgres.identity.svc.cluster.local"
@@ -73,7 +75,7 @@ resource "helm_release" "authentik" {
   wait = true
 
   lifecycle {
-    prevent_destroy = false
+    prevent_destroy = true
   }
 }
 

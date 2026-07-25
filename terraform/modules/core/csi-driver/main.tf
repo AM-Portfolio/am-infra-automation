@@ -23,4 +23,5 @@ resource "helm_release" "csi_secrets_store" {
     }
     enableSecretRotation = true
   })]
+  wait = false
 }

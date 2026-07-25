@@ -79,10 +79,10 @@ data "vault_kv_secret_v2" "identity" {
 }
 
 
-# Authentik provider — prioritizing environment-injected token for bootstrap recovery
+# Authentik provider — prioritizing foundation remote state token
 provider "authentik" {
-  url   = "http://localhost:9000"  # local port-forward / NodePort
-  token = var.authentik_token != "" ? var.authentik_token : try(data.vault_kv_secret_v2.identity.data["authentik_bootstrap_token"], "")
+  url   = "http://localhost:9001"  # local port-forward / NodePort
+  token = var.authentik_token != "" ? var.authentik_token : local.creds.authentik_bootstrap
 }
 
 provider "postgresql" {

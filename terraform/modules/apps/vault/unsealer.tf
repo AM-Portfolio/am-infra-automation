@@ -14,43 +14,73 @@ resource "null_resource" "vault_unsealer" {
 
   provisioner "local-exec" {
     command = <<EOT
-const { execSync } = require('child_process');
-const fs = require('fs');
+      # Resolve Kubeconfig path dynamically
+      KUBECONFIG_PATH="${var.kubeconfig_path}"
+      if [ -z "$KUBECONFIG_PATH" ]; then
+        if [ "${var.environment}" = "local" ]; then
+          KUBECONFIG_PATH="$HOME/.kube/config"
+        else
+          KUBECONFIG_PATH="/data/am-state/am-${var.environment}-config"
+        fi
+      fi
 
-const vpsUser = "root";
-const vpsIp = "150.242.202.122";
-const kubeconfig = "/data/am-state/am-preprod-config";
+      echo "🔐 [BOOTSTRAP] Waiting for Vault to be responsive on K8s cluster..."
+      STATUS_JSON=""
+      for i in {1..45}; do
+        STATUS_JSON=$(kubectl --kubeconfig="$KUBECONFIG_PATH" exec -n vault vault-0 -- env VAULT_ADDR=http://127.0.0.1:8200 vault status -format=json 2>/dev/null || true)
+        if [ -n "$STATUS_JSON" ]; then
+          echo "✅ vault-0 is responsive."
+          break
+        fi
+        echo "⏳ vault-0 is not responsive yet (waiting 10s...)"
+        sleep 10
+      done
 
-console.log("🔐 [BOOTSTRAP] Checking Vault status via SSH on VPS...");
+      if [ -z "$STATUS_JSON" ]; then
+        echo "❌ Timeout waiting for vault-0 to respond."
+        exit 1
+      fi
 
-try {
-    // Check if Vault is already unsealed on the VPS
-    const statusRaw = execSync(`ssh -o StrictHostKeyChecking=no $${vpsUser}@$${vpsIp} "kubectl --kubeconfig $${kubeconfig} exec -n vault vault-0 -- env VAULT_ADDR=http://127.0.0.1:8200 vault status -format=json"`, { stdio: 'pipe' }).toString();
-    const status = JSON.parse(statusRaw);
+      INITIALIZED=$(echo "$STATUS_JSON" | grep -o '"initialized":[^,]*' | cut -d: -f2 | tr -d ' "')
+      SEALED=$(echo "$STATUS_JSON" | grep -o '"sealed":[^,]*' | cut -d: -f2 | tr -d ' "')
 
-    if (status.initialized && !status.sealed) {
-        console.log("✅ Vault is already initialized and unsealed on VPS.");
-        process.exit(0);
-    } else if (status.initialized && status.sealed) {
-        console.log("🔓 Vault is initialized but sealed. Unsealing now...");
-        const unsealKey = "qOAUrydbiHJ88eOPhkSSD0Vv0ajF9EL/QZ+3U6JSqso=";
-        execSync(`ssh -o StrictHostKeyChecking=no $${vpsUser}@$${vpsIp} "kubectl --kubeconfig $${kubeconfig} exec -n vault vault-0 -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal $${unsealKey}"`, { stdio: 'inherit' });
-        console.log("✅ Vault Unsealed.");
-    }
-} catch (e) {
-    const err = e.stderr ? e.stderr.toString() : e.message;
-    if (err.includes('exit status 2') || e.status === 2) {
-         console.log("🚀 [INIT] Vault needs initialization. (This should not happen after reset)");
-    } else {
-        console.log("⚠️ Error checking Vault status: " + err);
-    }
-    // If we are here, it might be uninitialized. But I've already initialized it manually.
-    // Let's assume success if we can't get status but Vault is Running.
-    process.exit(0); 
-}
-EOT
+      if [ "$INITIALIZED" = "false" ]; then
+        echo "🚀 [INIT] Vault is uninitialized. Starting auto-initialization..."
+        INIT_JSON=$(kubectl --kubeconfig="$KUBECONFIG_PATH" exec -n vault vault-0 -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator init -key-shares=1 -key-threshold=1 -format=json)
+        
+        if [ -n "$INIT_JSON" ]; then
+          echo "✅ Vault successfully initialized."
+          
+          # Extract keys
+          UNSEAL_KEY=$(echo "$INIT_JSON" | grep -o '"unseal_keys_b64":\["[^"]*"' | cut -d'"' -f4)
+          
+          # Save to local workspace keys.json
+          echo "$INIT_JSON" > ../../../keys.json
+          echo "💾 Keys backed up to keys.json"
+          
+          # Create vault-unseal-keys secret in K8s
+          kubectl --kubeconfig="$KUBECONFIG_PATH" create secret generic vault-unseal-keys -n vault --from-literal=keys.json="$INIT_JSON" --dry-run=client -o yaml | kubectl --kubeconfig="$KUBECONFIG_PATH" apply -f -
+          echo "🔑 Kubernetes secret vault-unseal-keys created."
+          
+          # Perform first unseal
+          kubectl --kubeconfig="$KUBECONFIG_PATH" exec -n vault vault-0 -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal "$UNSEAL_KEY"
+          echo "🔓 Vault unsealed."
+        else
+          echo "❌ Failed to initialize Vault."
+          exit 1
+        fi
+      elif [ "$INITIALIZED" = "true" ] && [ "$SEALED" = "true" ]; then
+        echo "🔓 Vault is initialized but sealed. Unsealing now..."
+        kubectl --kubeconfig="$KUBECONFIG_PATH" exec -n vault vault-0 -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal "${var.vault_unseal_key}"
+        echo "✅ Vault Unsealed."
+      elif [ "$INITIALIZED" = "true" ] && [ "$SEALED" = "false" ]; then
+        echo "✅ Vault is already initialized and unsealed."
+      else
+        echo "⚠️ Unable to determine Vault status: $STATUS_JSON"
+      fi
+    EOT
 
-    interpreter = ["node", "-e"]
+    interpreter = ["/bin/bash", "-c"]
   }
 
   depends_on = [helm_release.vault]

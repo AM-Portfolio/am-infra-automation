@@ -10,23 +10,22 @@ function syncToRemote(config, sourceDir) {
     console.log(`\n🔄 Syncing local code to VPS [${config.sshHost}]...`);
     const remoteDest = `${config.sshHost}:${config.remoteBase}/`;
 
+    const sshPortOpt = config.sshPort ? `-p ${config.sshPort}` : '';
+    const scpPortOpt = config.sshPort ? `-P ${config.sshPort}` : '';
+
     try {
-        // Ensure remote base exists and clean up old terraform folder to prevent scp from nesting it 
-        // (i.e. creating terraform/terraform instead of overwriting)
-        const remoteTargetDir = `${config.remoteBase}/${path.basename(sourceDir)}`;
-        execSync(`ssh -o StrictHostKeyChecking=no ${config.sshHost} "mkdir -p ${config.remoteBase} && rm -rf ${remoteTargetDir}"`, { stdio: 'ignore' });
+        // Ensure remote base exists
+        execSync(`ssh -o StrictHostKeyChecking=no ${sshPortOpt} ${config.sshHost} "mkdir -p ${config.remoteBase}"`, { stdio: 'ignore' });
 
-        // Use SCP for windows-native compatibility
-        const cmd = `scp -o BatchMode=yes -o StrictHostKeyChecking=no -r "${sourceDir}" "${remoteDest}"`;
-        execSync(cmd, { stdio: 'inherit' });
-
-        // Remove locally-copied MacOS .terraform cache directories on the Linux VPS
-        execSync(`ssh -o StrictHostKeyChecking=no ${config.sshHost} "find ${remoteTargetDir} -name '.terraform' -type d -exec rm -rf {} +"`, { stdio: 'ignore' });
+        // Use rsync for lightning-fast differential sync (excludes node_modules, .git, and .terraform)
+        const sshCmd = config.sshPort ? `ssh -o StrictHostKeyChecking=no -p ${config.sshPort}` : 'ssh -o StrictHostKeyChecking=no';
+        const cmd = `rsync -avz --delete -e "${sshCmd}" --exclude='.terraform/' --exclude='.terraform.lock.hcl' --exclude='.git/' --exclude='node_modules/' "${sourceDir}" "${config.sshHost}:${config.remoteBase}"`;
+        execSync(cmd, { stdio: 'ignore' });
 
         hasSyncedThisProcess = true;
         console.log(`✅ Sync successful.\n`);
     } catch (e) {
-        console.error(`❌ Sync failed. Remote execution might use stale files.`);
+        console.error(`❌ Sync failed. Remote execution might use stale files: ${e.message}`);
         process.exit(1);
     }
 }
@@ -75,8 +74,31 @@ function runTerraform(config, command, tfArgs) {
                 }
             }
 
-            const remoteCmd = `cd ${config.workDir} && ${remoteSetup}kubectl --kubeconfig /data/am-state/am-preprod-config port-forward svc/vault 8200:8200 -n vault > /dev/null 2>&1 & KUBEPID=$! ; cd ${config.workDir} && sleep 2 ; ${envVars}${terraformBin} ${finalArgs.join(' ')} ; EXITCODE=$? ; kill $KUBEPID 2>/dev/null || true ; exit $EXITCODE`;
-            const sshCmd = `ssh -o StrictHostKeyChecking=no ${config.sshHost} "bash -lc '${remoteCmd}'"`;
+            let extraForwards = '';
+            let extraPids = '';
+            if (config.workDir.includes('identity') || config.workDir.includes('access')) {
+                extraForwards = `kubectl --kubeconfig /data/am-state/am-preprod-config port-forward svc/authentik-server 9001:80 -n identity > /dev/null 2>&1 & AUTH_PID=\\$! ; kubectl --kubeconfig /data/am-state/am-preprod-config port-forward svc/authentik-postgres 5432:5432 -n identity > /dev/null 2>&1 & PG_PID=\\$! ; `;
+                extraPids = ` ; kill \\$AUTH_PID \\$PG_PID 2>/dev/null || true`;
+            }
+
+            const isExposer = config.workDir.includes('exposer');
+            const isFoundation = config.workDir.includes('foundation');
+            const needsVault = !isExposer && !isFoundation;
+
+            const vaultForward = needsVault ? `kubectl --kubeconfig /data/am-state/am-preprod-config port-forward svc/vault 8200:8200 -n vault > /dev/null 2>&1 & KUBEPID=\\$! ; ` : '';
+            
+            // Build trap cleanup command using a quote-free shell function to avoid quoting collisions
+            let cleanupPids = [];
+            if (needsVault) cleanupPids.push('\\$KUBEPID');
+            if (config.workDir.includes('identity') || config.workDir.includes('access')) {
+                cleanupPids.push('\\$AUTH_PID', '\\$PG_PID');
+            }
+            const trapCmd = cleanupPids.length > 0 ? `cleanup() { kill ${cleanupPids.join(' ')} 2>/dev/null || true; }; trap cleanup EXIT && ` : '';
+
+            const sshPortOpt = config.sshPort ? `-p ${config.sshPort}` : '';
+            const remoteCmd = `cd ${config.workDir} && ${remoteSetup}${vaultForward}${extraForwards}cd ${config.workDir} && sleep 5 ; ${trapCmd}${envVars}${terraformBin} ${finalArgs.join(' ')}`;
+            const encodedCmd = Buffer.from(remoteCmd).toString('base64');
+            const sshCmd = `ssh -o StrictHostKeyChecking=no ${sshPortOpt} ${config.sshHost} "echo '${encodedCmd}' | base64 -d | bash -l"`;
             spawn(sshCmd, {
                 shell: true,
                 stdio: 'inherit'

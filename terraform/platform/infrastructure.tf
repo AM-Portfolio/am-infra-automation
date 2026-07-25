@@ -6,5 +6,6 @@ module "github_runner" {
   github_repo_url = var.github_repo_url
   github_org_name = var.github_org_name
   vps_pass        = var.vps_pass
+  environment     = var.environment
 }
 

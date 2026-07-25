@@ -41,8 +41,13 @@ variable "environment" {
 }
 
 variable "infra_script_path" {
-
   description = "Path to scripts/infra.py from the repo root (relative)"
   type        = string
   default     = "scripts/infra.py"
+}
+
+variable "namespace" {
+  description = "Target namespace for GitHub Runner"
+  type        = string
+  default     = "github-actions"
 }

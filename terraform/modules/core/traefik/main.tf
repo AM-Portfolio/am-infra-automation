@@ -344,11 +344,10 @@ resource "helm_release" "traefik" {
       podLabels:
         app: traefik
 
-    logs:
-      general:
-        level: DEBUG
-      access:
-        enabled: true
+    log:
+      level: DEBUG
+    accessLog:
+      enabled: true
 
     additionalArguments:
       - "--providers.file.directory=/etc/traefik/dynamic-config/"
@@ -383,10 +382,12 @@ resource "helm_release" "traefik" {
       - name: traefik-dynamic-config
         mountPath: /etc/traefik/dynamic-config
         type: configMap
-  EOT
+    EOT
   ]
 
   depends_on = [kubernetes_config_map.traefik_dynamic]
+  timeout    = 900
+  wait       = false
 
   lifecycle {
     prevent_destroy = true

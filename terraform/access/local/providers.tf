@@ -3,6 +3,8 @@
 # ------------------------------------------------------------------------------
 
 terraform {
+  backend "local" {}
+
   required_providers {
     kubernetes = {
       source  = "hashicorp/kubernetes"
@@ -14,7 +16,7 @@ terraform {
     }
     authentik = {
       source  = "goauthentik/authentik"
-      version = "~> 2024.2.0"
+      version = "2024.2.0"
     }
     random = {
       source  = "hashicorp/random"
@@ -65,8 +67,15 @@ data "vault_generic_secret" "authentik_token" {
   path = "secret/infra/identity/automation"
 }
 
+locals {
+  raw_auto_token = lookup(data.vault_generic_secret.authentik_token.data, "terraform_token", "")
+  effective_authentik_token = (var.authentik_token != "") ? var.authentik_token : (
+    (local.raw_auto_token != "" && local.raw_auto_token != "<nil>") ? local.raw_auto_token : data.vault_kv_secret_v2.identity_bootstrap.data["authentik_bootstrap_token"]
+  )
+}
+
 # Authentik provider — prioritizing bootstrap token for local stability
 provider "authentik" {
-  url   = "http://localhost:9000"
-  token = var.authentik_token # Forced root override via .env/orchestrator
+  url   = "http://localhost:9001"
+  token = local.effective_authentik_token
 }

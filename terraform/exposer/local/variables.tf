@@ -3,6 +3,16 @@
 # ------------------------------------------------------------------------------
 
 # Core
+variable "kubeconfig_path" {
+  type    = string
+  default = ""
+}
+
+variable "kubeconfig_context" {
+  type    = string
+  default = ""
+}
+
 variable "root_domain" {
   description = "The primary domain name for the infrastructure services (e.g. munish.org)"
   type        = string

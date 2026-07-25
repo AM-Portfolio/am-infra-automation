@@ -4,7 +4,8 @@
   "description": "Modular Infrastructure Orchestrator for AM-Ecosystem",
   "main": "scripts/orchestration/manage.js",
   "scripts": {
-    "_pipeline_": "=== VAULT-FIRST PIPELINE: foundation → vault → admin → gateway → identity → data-stores → monitoring → platform ===",
+    "_pipeline_": "=== VAULT-FIRST PIPELINE: foundation → vault → admin → gateway → identity → access → data-stores → monitoring → platform ===",
+    "token:refresh": "bash scripts/refresh_authentik_token.sh",
 
     "foundation:init":     "node scripts/orchestration/manage.js init    -p foundation",
     "foundation:plan":     "node scripts/orchestration/manage.js plan    -p foundation",
@@ -16,10 +17,7 @@
     "vault:apply":         "node scripts/orchestration/manage.js apply   -p vault",
     "vault:destroy":       "node scripts/orchestration/manage.js destroy -p vault",
 
-    "admin:init":          "node scripts/orchestration/manage.js init    -p admin",
-    "admin:plan":          "node scripts/orchestration/manage.js plan    -p admin",
-    "admin:apply":         "node scripts/orchestration/manage.js apply   -p admin",
-    "admin:destroy":       "node scripts/orchestration/manage.js destroy -p admin",
+
 
     "gateway:init":        "node scripts/orchestration/manage.js init    -p gateway",
     "gateway:plan":        "node scripts/orchestration/manage.js plan    -p gateway",
@@ -61,10 +59,14 @@
     "_preprod_": "=== PREPROD (VPS) EQUIVALENTS ===",
     "vps:foundation:apply":   "node scripts/orchestration/manage.js apply -p foundation  -e preprod",
     "vps:vault:apply":        "node scripts/orchestration/manage.js apply -p vault       -e preprod",
+
     "vps:gateway:apply":      "node scripts/orchestration/manage.js apply -p gateway     -e preprod",
     "vps:identity:apply":     "node scripts/orchestration/manage.js apply -p identity    -e preprod",
+    "vps:access:apply":       "node scripts/orchestration/manage.js apply -p access      -e preprod",
     "vps:data-stores:apply":  "node scripts/orchestration/manage.js apply -p data-stores -e preprod",
     "vps:monitoring:apply":   "node scripts/orchestration/manage.js apply -p monitoring  -e preprod",
+    "vps:platform:apply":     "node scripts/orchestration/manage.js apply -p platform    -e preprod",
+    "vps:exposer:apply":      "node scripts/orchestration/manage.js apply -p exposer     -e preprod",
 
     "_utils_": "=== UTILITIES ===",
     "factory-reset":       "node scripts/orchestration/factory_reset.js",

@@ -142,14 +142,14 @@ resource "kubernetes_deployment" "vault_watcher" {
           image = "alpine:3.19"
 
           # Install curl + jq once at startup (tiny ~5MB download), then loop.
-          # Using the internal vault Service DNS — no port-forward needed.
+          # Using the headless vault-internal DNS to bypass readiness checks during unseal.
           command = ["/bin/sh", "-c"]
           args = [
             replace(trimspace(<<-EOT
               set -e
               apk add --no-cache curl jq > /dev/null 2>&1
 
-              VAULT_ADDR="http://vault:8200"
+              VAULT_ADDR="http://vault-0.vault-internal:8200"
               KEYS_FILE="/vault-keys/keys.json"
               POLL_INTERVAL="${var.watcher_poll_interval_seconds}"
 

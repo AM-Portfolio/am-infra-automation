@@ -30,6 +30,9 @@ resource "helm_release" "grafana" {
   version    = "7.0.0"
 
   values = [yamlencode({
+    nodeSelector = {
+      role = "observability"
+    }
     adminUser     = var.grafana_admin_user
     adminPassword = var.grafana_admin_password
     
@@ -70,6 +73,9 @@ resource "helm_release" "prometheus" {
     alertmanager = { enabled = false }
     pushgateway  = { enabled = false }
     server = {
+      nodeSelector = {
+        role = "observability"
+      }
       global = { scrape_interval = "15s" }
       persistence = { enabled = true, size = "5Gi", storageClass = "standard" }
     }
@@ -101,7 +107,12 @@ resource "helm_release" "loki" {
         max_streams_per_user    = 10000
       }
     }
-    singleBinary = { replicas = 1 }
+    singleBinary = {
+      replicas = 1
+      nodeSelector = {
+        role = "observability"
+      }
+    }
   })]
 
   wait = true

@@ -8,7 +8,7 @@
 
 'use strict';
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const http = require('http');
 
@@ -17,21 +17,21 @@ const VAULT_ADDR = 'http://127.0.0.1:8200';
 // ── Vault KV paths that map to .env keys ──────────────────────────────────────
 const VAULT_SECRET_MAP = {
   'infra/gateway': {
-    cloudflare_token:      'CLOUDFLARE_TOKEN',
+    cloudflare_token: 'CLOUDFLARE_TOKEN',
     cloudflare_account_id: 'CLOUDFLARE_ACCOUNT_ID',
-    cloudflare_zone_id:    'CLOUDFLARE_ZONE_ID',
+    cloudflare_zone_id: 'CLOUDFLARE_ZONE_ID',
     cloudflare_tunnel_secret: 'CLOUDFLARE_TUNNEL_SECRET',
   },
   'infra/databases': {
     postgresql_password: 'POSTGRESQL_PASSWORD',
-    mongodb_password:    'MONGODB_PASSWORD',
-    redis_password:      'REDIS_PASSWORD',
-    influxdb_token:      'INFLUXDB_TOKEN',
-    grafana_password:    'GRAFANA_PASSWORD',
+    mongodb_password: 'MONGODB_PASSWORD',
+    redis_password: 'REDIS_PASSWORD',
+    influxdb_token: 'INFLUXDB_TOKEN',
+    grafana_password: 'GRAFANA_PASSWORD',
   },
   'infra/identity': {
-    authentik_token:       'AUTHENTIK_TOKEN',
-    authentik_secret_key:  'AUTHENTIK_SECRET_KEY',
+    authentik_token: 'AUTHENTIK_TOKEN',
+    authentik_secret_key: 'AUTHENTIK_SECRET_KEY',
   },
   'infra/platform': {
     github_pat: 'GITHUB_PAT',
@@ -40,11 +40,11 @@ const VAULT_SECRET_MAP = {
     headlamp_token: 'HEADLAMP_TOKEN',
   },
   'infra/oidc-data-stores': {
-    grafana_client_id:      'GRAFANA_CLIENT_ID',
-    grafana_client_secret:  'GRAFANA_CLIENT_SECRET',
-    headlamp_client_id:     'HEADLAMP_CLIENT_ID',
+    grafana_client_id: 'GRAFANA_CLIENT_ID',
+    grafana_client_secret: 'GRAFANA_CLIENT_SECRET',
+    headlamp_client_id: 'HEADLAMP_CLIENT_ID',
     headlamp_client_secret: 'HEADLAMP_CLIENT_SECRET',
-    oidc_issuer_url:        'OIDC_ISSUER_URL',
+    oidc_issuer_url: 'OIDC_ISSUER_URL',
   },
 };
 
@@ -60,7 +60,7 @@ function injectEnv(kvMap) {
 
 function resolveVaultToken(baseDir) {
   if (process.env.VAULT_TOKEN) return process.env.VAULT_TOKEN;
-  
+
   const credFile = path.join(baseDir, 'credentials.txt');
   if (fs.existsSync(credFile)) {
     const lines = fs.readFileSync(credFile, 'utf8').split('\n');
@@ -77,13 +77,13 @@ function resolveVaultToken(baseDir) {
 function httpGet(url, token) {
   return new Promise((resolve, reject) => {
     const opts = new URL(url);
-    const req  = http.request({
+    const req = http.request({
       hostname: opts.hostname,
-      port:     opts.port || 8200,
-      path:     opts.pathname,
-      method:   'GET',
-      headers:  { 'X-Vault-Token': token },
-      timeout:  3000,
+      port: opts.port || 8200,
+      path: opts.pathname,
+      method: 'GET',
+      headers: { 'X-Vault-Token': token },
+      timeout: 3000,
     }, (res) => {
       let body = '';
       res.on('data', (c) => body += c);
@@ -108,23 +108,22 @@ function httpGet(url, token) {
  * Loads .env file immediately. Does NOT attempt to talk to Vault.
  * Used for bootstrapping and providing initial seed data.
  */
-function loadBaseline(baseDir) {
+function loadBaseline(baseDir, env = 'preprod') {
   const envPath = path.join(baseDir, '.env');
+  const dotEnv = {};
   if (!fs.existsSync(envPath)) {
     console.log(`⚠️  No .env file found at ${envPath}.`);
-    return false;
+  } else {
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+        const [key, ...valueParts] = trimmed.split('=');
+        const value = valueParts.join('=').replace(/^["']|["']$/g, '');
+        dotEnv[key.trim()] = value;
+      }
+    });
   }
-
-  const dotEnv = {};
-  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
-  lines.forEach(line => {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
-      const [key, ...valueParts] = trimmed.split('=');
-      const value = valueParts.join('=').replace(/^["']|["']$/g, '');
-      dotEnv[key.trim()] = value;
-    }
-  });
 
   // ── Local Credential Cache (Cassay) Check ──
   // Check for credentials.txt in the potential work directories
@@ -152,12 +151,18 @@ function loadBaseline(baseDir) {
   // This prevents stale .env tokens from causing 403 errors.
   try {
     const { execSync } = require('child_process');
-    const secretOutput = execSync('kubectl get secret vault-unseal-keys -n vault -o json', { stdio: 'pipe' }).toString();
+    const os = require('os');
+    const kubeconfigPath = path.join(os.homedir(), '.kube', env === 'preprod' ? 'config-am-preprod' : 'am-local-config');
+    let kubeconfigOpt = '';
+    if (fs.existsSync(kubeconfigPath)) {
+      kubeconfigOpt = `--kubeconfig="${kubeconfigPath}"`;
+    }
+    const secretOutput = execSync(`kubectl ${kubeconfigOpt} get secret vault-unseal-keys -n vault -o json`, { stdio: 'pipe' }).toString();
     const secret = JSON.parse(secretOutput);
     if (secret && secret.data && secret.data['keys.json']) {
       const decoded = Buffer.from(secret.data['keys.json'], 'base64').toString('utf8');
       const keys = JSON.parse(decoded);
-      
+
       if (keys.root_token) {
         dotEnv['VAULT_ROOT_TOKEN'] = keys.root_token;
         dotEnv['TF_VAR_VAULT_ROOT_TOKEN'] = keys.root_token;
@@ -182,7 +187,7 @@ function loadBaseline(baseDir) {
  * Attempts to fetch secrets from Vault and OVERRIDE the baseline.
  * Returns true if synchronization succeeded, false otherwise.
  */
-async function syncFromVault(baseDir) {
+async function syncFromVault(baseDir, env = 'preprod') {
   const vaultToken = resolveVaultToken(baseDir);
   if (!vaultToken) {
     console.log(`ℹ️  Vault token not resolved; skipping Vault sync.`);
@@ -211,10 +216,11 @@ async function syncFromVault(baseDir) {
 
   for (const [kvPath, keyMap] of Object.entries(VAULT_SECRET_MAP)) {
     try {
-      const url = `${VAULT_ADDR}/v1/secret/data/${kvPath}`;
+      const resolvedPath = env === 'local' ? kvPath : `${env}/${kvPath}`;
+      const url = `${VAULT_ADDR}/v1/secret/data/${resolvedPath}`;
       const res = await httpGet(url, vaultToken);
       const secrets = res.data && res.data.data ? res.data.data : {};
-      
+
       for (const [vaultKey, envKey] of Object.entries(keyMap)) {
         if (secrets[vaultKey] !== undefined) {
           vaultOverrides[envKey] = secrets[vaultKey];

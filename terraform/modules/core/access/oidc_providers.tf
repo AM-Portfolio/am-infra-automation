@@ -13,8 +13,9 @@ data "authentik_flow" "default_provider_authorization_implicit_consent" {
 # 🛠️ OAuth2/OIDC — pgAdmin 4
 # ------------------------------------------------------------------------------
 resource "random_password" "pgadmin_client_secret" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 resource "authentik_provider_oauth2" "pgadmin" {
@@ -32,8 +33,9 @@ resource "authentik_provider_oauth2" "pgadmin" {
 # 🛠️ OAuth2/OIDC — Kafka UI
 # ------------------------------------------------------------------------------
 resource "random_password" "kafka_client_secret" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 resource "authentik_provider_oauth2" "kafka" {
@@ -50,8 +52,9 @@ resource "authentik_provider_oauth2" "kafka" {
 
 # 💾 Vault Secret Storage — For the App layer to consume
 # ------------------------------------------------------------------------------
-resource "vault_generic_secret" "oidc_secrets" {
-  path = "secret/infra/oidc-data-stores"
+resource "vault_kv_secret_v2" "oidc_secrets" {
+  mount = "secret"
+  name  = "${var.environment}/infra/oidc-data-stores"
   data_json = jsonencode({
     # Monitoring
     grafana_client_id      = "grafana"

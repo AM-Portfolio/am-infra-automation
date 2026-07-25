@@ -25,27 +25,27 @@ resource "null_resource" "exposer_bridge" {
   }
 
   provisioner "local-exec" {
-    command = <<EOT
-      docker rm -f ${var.container_name} 2>$null
-      docker run -d --name ${var.container_name} --entrypoint /bin/sh `
-        ${local.docker_ports} `
-        --network kind `
-        --restart always `
-        alpine/socat `
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<EOT
+      docker rm -f ${var.container_name} 2>/dev/null || true
+      docker run -d --name ${var.container_name} \
+        ${local.docker_ports} \
+        --network kind \
+        --restart always \
+        alpine/socat \
         -c "echo '🌐 AM Bridge Online...'; ${local.socat_cmd} & wait"
       
-      Write-Host "⏳ Waiting for bridge stability (5s)..."
-      Start-Sleep -s 5
+      echo "⏳ Waiting for bridge stability (5s)..."
+      sleep 5
       
-      $status = (docker inspect -f '{{.State.Running}}' ${var.container_name})
-      if ($status -eq "true") {
-        Write-Host "✅ Bridge is UP and stable."
-      } else {
-        Write-Error "❌ Bridge failed to stay UP. Check logs with 'docker logs ${var.container_name}'"
+      status=$(docker inspect -f '{{.State.Running}}' ${var.container_name})
+      if [ "$status" = "true" ]; then
+        echo "✅ Bridge is UP and stable."
+      else
+        echo "❌ Bridge failed to stay UP. Check logs with 'docker logs ${var.container_name}'"
         exit 1
-      }
+      fi
     EOT
-    interpreter = ["powershell", "-Command"]
   }
 
   provisioner "local-exec" {

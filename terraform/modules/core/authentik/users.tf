@@ -32,8 +32,9 @@ resource "authentik_user" "developer" {
 
 # 3. PERMANENT AUTOMATION TOKEN
 resource "authentik_token" "terraform" {
-  identifier = "terraform-automation"
-  user       = authentik_user.admin.id
-  intent     = "api"
-  expiring   = false
+  identifier   = "terraform-automation-v2"
+  user         = authentik_user.admin.id
+  intent       = "api"
+  expiring     = false
+  retrieve_key = true
 }

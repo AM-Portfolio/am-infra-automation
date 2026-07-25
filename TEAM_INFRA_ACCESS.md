@@ -1,6 +1,6 @@
 # 🚀 Team Infrastructure Access Guide - AM Portfolio
 
-This guide contains the finalized connection details and credentials for the production-grade infrastructure on the VPS (`203.174.22.129`).
+This guide contains the finalized connection details and credentials for the production-grade infrastructure on the VPS (`103.127.146.57`).
 
 ---
 
@@ -50,16 +50,16 @@ To connect your local DB tools (DBeaver, Compass) to these databases, use your S
 
 ```bash
 # Example for PostgreSQL
-ssh -L 5432:postgresql.infra.svc.cluster.local:5432 root@203.174.22.129
+ssh -p 7576 -L 5432:postgresql.infra.svc.cluster.local:5432 root@103.127.146.57
 ```
 
 ---
 
 ## 📁 5. Repository & Code
 
-- **Repository**: [https://github.com/AM-Portfolio/am-infra.git](https://github.com/AM-Portfolio/am-infra.git)
+- **Repository**: [https://github.com/AM-Portfolio/am-infra-automation.git](https://github.com/AM-Portfolio/am-infra-automation.git)
 - **Deployment Branch**: `develop`
-- **Location on VPS**: `/root/am-repos/am-infra`
+- **Location on VPS**: `/data/am-repos/am-infra-automation`
 
 ---
 

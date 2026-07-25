@@ -15,6 +15,10 @@ resource "kubernetes_persistent_volume" "redis_pv" {
     access_modes                     = ["ReadWriteOnce"]
     persistent_volume_reclaim_policy = "Retain"
     storage_class_name               = "manual-hostpath"
+    persistent_volume_source {
+      host_path {
+        path = "/var/am-infra/data/redis"
+        type = "DirectoryOrCreate"
       }
     }
   }
@@ -68,6 +72,9 @@ resource "kubernetes_stateful_set" "redis" {
         labels = { app = "redis" }
       }
       spec {
+        node_selector = {
+          role = "infra"
+        }
         container {
           name  = "redis"
           image = "redis:7.2-alpine"
@@ -137,6 +144,9 @@ resource "helm_release" "redis_commander" {
     redis = {
       host     = "redis-master"
       password = var.redis_password
+    }
+    nodeSelector = {
+      role = "infra"
     }
     env = [
       { name = "REDIS_HOSTS", value = "local:redis-master:6379:0:${var.redis_password}" }

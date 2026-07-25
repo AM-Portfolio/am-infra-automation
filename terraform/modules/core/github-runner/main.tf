@@ -23,15 +23,6 @@ locals {
 # 1. Namespace
 # ------------------------------------------------------------------------------
 
-resource "kubernetes_namespace" "github_actions" {
-  metadata {
-    name = "github-actions"
-    labels = {
-      managed-by = "terraform"
-    }
-  }
-}
-
 # ------------------------------------------------------------------------------
 # 2. Write Dockerfile + start.sh to VPS and build the image there
 # ------------------------------------------------------------------------------
@@ -46,41 +37,44 @@ resource "terraform_data" "runner_image" {
 
   # Build logic branched by environment
   provisioner "local-exec" {
-    interpreter = ["powershell", "-Command"]
-    command     = <<-PS1
-      $env = "${var.environment}"
-      $modulePath = "${path.module}"
-      $rootPath = "${path.cwd}/../../.."
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      ENV="${var.environment}"
+      MODULE_PATH="${path.module}"
+      ROOT_PATH="${path.cwd}/../../.."
       
-      if ($env -eq "local") {
-        Write-Host ">>> Building Runner Image LOCALLY for Kind..."
-        cd $modulePath
+      if [ "$ENV" = "local" ]; then
+        echo ">>> Building Runner Image LOCALLY for Kind..."
+        cd "$MODULE_PATH"
         docker build -t am-infra-gh-runner:latest -f Dockerfile.runner .
-        if ($LASTEXITCODE -ne 0) { throw "Docker build failed" }
+        if [ $? -ne 0 ]; then
+          echo "Docker build failed"
+          exit 1
+        fi
         
         # Use kind to load. If kind is missing from PATH, fallback to manual import
-        if (Get-Command kind -ErrorAction SilentlyContinue) {
+        if command -v kind >/dev/null 2>&1; then
           kind load docker-image am-infra-gh-runner:latest --name am-local
-        } else {
-          Write-Host "Kind not found in PATH, attempting manual container load..."
+        else
+          echo "Kind not found in PATH, attempting manual container load..."
           docker save am-infra-gh-runner:latest -o runner_image.tar
           docker cp runner_image.tar am-local-control-plane:/tmp/runner_image.tar
           docker exec am-local-control-plane ctr -n k8s.io images import /tmp/runner_image.tar
-          Remove-Item runner_image.tar
-        }
-      } else {
-        Write-Host ">>> Building Runner Image on VPS ($env)..."
-        # Push files to VPS using the orchestrator
-        python "$rootPath/scripts/orchestration/infra.py" push "$modulePath" "/tmp/runner-build"
-        if ($LASTEXITCODE -ne 0) { throw "Failed to push files to VPS" }
-
-        # Build on VPS
-        python "$rootPath/scripts/orchestration/infra.py" exec "cd /tmp/runner-build && docker build -t am-infra-gh-runner:latest -f Dockerfile.runner ."
-        if ($LASTEXITCODE -ne 0) { throw "Remote docker build failed" }
+          rm runner_image.tar
+        fi
+      else
+        echo ">>> Building Runner Image on VPS ($ENV)..."
+        # Since this local-exec is running ON the VPS host itself, build directly
+        cd "$MODULE_PATH"
+        docker build -t am-infra-gh-runner:latest -f Dockerfile.runner .
+        if [ $? -ne 0 ]; then
+          echo "Remote docker build failed"
+          exit 1
+        fi
         
-        Write-Host "Runner image successfully built on VPS."
-      }
-    PS1
+        echo "Runner image successfully built on VPS."
+      fi
+    EOT
   }
 }
 
@@ -92,7 +86,7 @@ resource "terraform_data" "runner_image" {
 resource "kubernetes_secret" "github_runner_secret" {
   metadata {
     name      = "github-runner-secret"
-    namespace = kubernetes_namespace.github_actions.metadata[0].name
+    namespace = var.namespace
   }
   type = "Opaque"
   data = {
@@ -112,7 +106,7 @@ resource "kubernetes_secret" "github_runner_secret" {
 resource "kubernetes_service_account" "github_runner_sa" {
   metadata {
     name      = "github-runner-sa"
-    namespace = kubernetes_namespace.github_actions.metadata[0].name
+    namespace = var.namespace
   }
 }
 
@@ -128,7 +122,7 @@ resource "kubernetes_cluster_role_binding" "github_runner_binding" {
   subject {
     kind      = "ServiceAccount"
     name      = kubernetes_service_account.github_runner_sa.metadata[0].name
-    namespace = kubernetes_namespace.github_actions.metadata[0].name
+    namespace = var.namespace
   }
 }
 
@@ -142,7 +136,7 @@ resource "kubernetes_deployment" "github_runner" {
 
   metadata {
     name      = "github-runner"
-    namespace = kubernetes_namespace.github_actions.metadata[0].name
+    namespace = var.namespace
     labels    = { app = "github-runner" }
   }
 
@@ -217,7 +211,7 @@ resource "kubernetes_deployment" "github_runner" {
           host_path { path = "/var/run/docker.sock" }
         }
 
-        node_selector = { tier = "infra" }
+        node_selector = { role = "infra" }
       }
     }
   }

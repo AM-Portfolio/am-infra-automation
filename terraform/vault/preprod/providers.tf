@@ -36,19 +36,20 @@ terraform {
 provider "kubernetes" {
   config_path    = var.kubeconfig_path
   config_context = var.kubeconfig_context
+  insecure       = true
 }
 
 provider "helm" {
   kubernetes {
     config_path    = var.kubeconfig_path
     config_context = var.kubeconfig_context
+    insecure       = true
   }
 }
 
 provider "kubectl" {
   config_path      = var.kubeconfig_path
   config_context   = var.kubeconfig_context
-  load_config_file = true
 }
 
 # 2. Dynamic Vault Token Extraction — Reuses cluster secrets for zero-touch auth
@@ -65,8 +66,8 @@ data "kubernetes_secret" "vault_keys" {
 
 locals {
   # Fish the root token from the cluster secret; fallback to manual var if needed
-  # We use the index [0] only if the data source was actually created.
-  vault_root_token = var.vault_root_token != "" ? var.vault_root_token : (length(data.kubernetes_secret.vault_keys) > 0 ? jsondecode(data.kubernetes_secret.vault_keys[0].data["keys.json"]).root_token : "")
+  # We use try() to robustly handle when the secret is not yet created during plan phases.
+  vault_root_token = var.vault_root_token != "" ? var.vault_root_token : try(jsondecode(data.kubernetes_secret.vault_keys[0].data["keys.json"]).root_token, "")
 }
 
 # 3. Vault Provider — Authenticated for secret persistence

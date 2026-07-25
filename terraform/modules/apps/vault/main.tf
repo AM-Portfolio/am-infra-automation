@@ -14,6 +14,9 @@ resource "helm_release" "vault" {
 
   values = [yamlencode({
     server = {
+      nodeSelector = {
+        role = "infra"
+      }
       ha = { enabled = false }
       standalone = { enabled = true }
       service = {
@@ -24,6 +27,14 @@ resource "helm_release" "vault" {
       resources = {
         requests = { memory = "128Mi", cpu = "50m" }
         limits   = { memory = "256Mi", cpu = "200m" }
+      }
+      readinessProbe = {
+        enabled        = true
+        timeoutSeconds = 10
+      }
+      livenessProbe = {
+        enabled        = true
+        timeoutSeconds = 10
       }
       dataStorage = {
         enabled      = true

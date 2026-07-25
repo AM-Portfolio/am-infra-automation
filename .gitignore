@@ -114,8 +114,3 @@ terraform/scratch_*.py
 terraform/*-utf8.json
 terraform/tfplan
 terraform/current_state_list*.txt
-
-# Local/Secret Files copied from am-infra
-keys.json
-MONGO_RESTORED_PASSWORD.txt
-_legacy_backup/

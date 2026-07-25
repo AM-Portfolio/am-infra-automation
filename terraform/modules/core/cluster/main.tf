@@ -26,21 +26,71 @@ resource "kind_cluster" "this" {
       api_server_port    = 6443
     }
 
-    # 1. CORE CONTROL PLANE
+    # Node 1: Control plane + databases/infra services
     node {
       role = "control-plane"
-      kubeadm_config_patches = var.vps_ip != "" ? [
-        <<-EOT
-        kind: ClusterConfiguration
-        apiServer:
-          certSANs:
-            - "${var.vps_ip}"
-        EOT
-      ] : []
+      kubeadm_config_patches = concat(
+        [
+          <<-EOT
+          kind: InitConfiguration
+          nodeRegistration:
+            kubeletExtraArgs:
+              node-labels: "role=infra"
+          EOT
+        ],
+        [
+          <<-EOT
+          kind: ClusterConfiguration
+          etcd:
+            local:
+              extraArgs:
+                heartbeat-interval: "500"
+                election-timeout: "2500"
+          EOT
+        ],
+        var.vps_ip != "" ? [
+          <<-EOT
+          kind: ClusterConfiguration
+          apiServer:
+            certSANs:
+              - "${var.vps_ip}"
+          EOT
+        ] : []
+      )
       extra_mounts {
         host_path      = "/mnt/am-infra/data"
         container_path = "/mnt/am-infra/data"
       }
+      extra_mounts {
+        host_path      = "/mnt/etcd-ram"
+        container_path = "/var/lib/etcd"
+      }
+    }
+
+    # Node 2: Microservices and applications
+    node {
+      role = "worker"
+      kubeadm_config_patches = [
+        <<-EOT
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "role=services"
+        EOT
+      ]
+    }
+
+    # Node 3: Observability stack (Prometheus, Grafana, Loki)
+    node {
+      role = "worker"
+      kubeadm_config_patches = [
+        <<-EOT
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "role=observability"
+        EOT
+      ]
     }
   }
 }
@@ -48,20 +98,4 @@ resource "kind_cluster" "this" {
 output "kubeconfig" {
   value     = kind_cluster.this.kubeconfig
   sensitive = true
-}
-
-output "endpoint" {
-  value = kind_cluster.this.endpoint
-}
-
-output "cluster_ca_certificate" {
-  value = kind_cluster.this.cluster_ca_certificate
-}
-
-output "client_certificate" {
-  value = kind_cluster.this.client_certificate
-}
-
-output "client_key" {
-  value = kind_cluster.this.client_key
 }

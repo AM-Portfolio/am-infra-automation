@@ -73,6 +73,9 @@ resource "kubernetes_stateful_set" "postgresql" {
         labels = { app = "postgresql" }
       }
       spec {
+        node_selector = {
+          role = "infra"
+        }
         container {
           name  = "postgresql"
           image = "postgres:16-alpine"
@@ -126,12 +129,13 @@ resource "kubernetes_service" "postgresql" {
 # ------------------------------------------------------------------------------
 # OIDC Configuration Fetch (from Vault)
 # ------------------------------------------------------------------------------
-data "vault_generic_secret" "oidc" {
-  path = "secret/infra/oidc-data-stores"
+data "vault_kv_secret_v2" "oidc" {
+  mount = "secret"
+  name  = "${var.environment}/infra/oidc-data-stores"
 }
 
 locals {
-  oidc_data = data.vault_generic_secret.oidc.data
+  oidc_data = data.vault_kv_secret_v2.oidc.data
   authentik_host = "authentik${var.environment == "prod" ? "" : "-${var.environment}"}.${var.root_domain}"
 
   # pgAdmin OIDC Environment (Extracted for Checksum)
@@ -159,10 +163,19 @@ resource "helm_release" "pgadmin" {
   version    = "1.23.0"
 
   values = [yamlencode({
-    env = merge({
-      email     = var.pgadmin_user
-      password  = var.pgadmin_password
-    }, local.pgadmin_oidc_env)
+    nodeSelector = {
+      role = "infra"
+    }
+    env = {
+      email    = var.pgadmin_user
+      password = var.pgadmin_password
+      variables = [
+        for k, v in local.pgadmin_oidc_env : {
+          name  = k
+          value = v
+        }
+      ]
+    }
     
     # 🔄 Automated Rollout: Checksum forces restart when OIDC config changes
     podAnnotations = {
@@ -194,7 +207,7 @@ resource "helm_release" "pgadmin" {
 
     # 🔑 Automated Login: Injecting .pgpass for passwordless entry
     # Note: pgAdmin expects the file at /var/lib/pgadmin/storage/<email_with_dots_replaced_by_underscores>/pgpass
-    extraInitContainers = [{
+    extraInitContainers = yamlencode([{
       name  = "setup-pgpass"
       image = "busybox"
       command = ["sh", "-c", "mkdir -p /var/lib/pgadmin/storage/${replace(var.pgadmin_user, ".", "_")} && echo 'postgresql:5432:*:${var.db_user}:${var.db_password}' > /var/lib/pgadmin/storage/${replace(var.pgadmin_user, ".", "_")}/pgpass && chmod 600 /var/lib/pgadmin/storage/${replace(var.pgadmin_user, ".", "_")}/pgpass && chown 5050:5050 /var/lib/pgadmin/storage/${replace(var.pgadmin_user, ".", "_")}/pgpass"]
@@ -202,7 +215,7 @@ resource "helm_release" "pgadmin" {
         name      = "pgadmin-data"
         mountPath = "/var/lib/pgadmin"
       }]
-    }]
+    }])
   })]
 
   wait = true
