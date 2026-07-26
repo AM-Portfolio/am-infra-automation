@@ -120,6 +120,14 @@ resource "vault_mount" "secret" {
   depends_on  = [module.vault]
 }
 
+resource "vault_mount" "apps" {
+  path        = "apps"
+  type        = "kv"
+  options     = { version = "2" }
+  description = "Application-specific KV-V2 store"
+  depends_on  = [module.vault]
+}
+
 # ── Step 5: Seed secrets into Vault KV paths (environment-scoped) ────────────
 # All paths are prefixed with var.environment so local/preprod secrets never
 # overwrite each other even if pointing at the same Vault instance.
@@ -216,6 +224,44 @@ resource "vault_approle_auth_backend_role" "am_automation_role" {
 resource "vault_approle_auth_backend_role_secret_id" "am_automation_secret_id" {
   backend   = "approle"
   role_name = vault_approle_auth_backend_role.am_automation_role.role_name
+}
+
+# ── Step 3d: Enable and configure Kubernetes Auth backend for Sidecar injection
+resource "vault_policy" "am_backend_policy" {
+  name   = "am-backend-policy"
+  policy = <<EOT
+path "secret/data/*" {
+  capabilities = ["read", "list"]
+}
+path "secret/metadata/*" {
+  capabilities = ["read", "list"]
+}
+path "apps/data/*" {
+  capabilities = ["read", "list"]
+}
+path "apps/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOT
+}
+
+resource "vault_auth_backend" "kubernetes" {
+  type = "kubernetes"
+}
+
+resource "vault_kubernetes_auth_backend_config" "kubernetes" {
+  backend                = vault_auth_backend.kubernetes.path
+  kubernetes_host        = "https://kubernetes.default.svc"
+}
+
+resource "vault_kubernetes_auth_backend_role" "am_backend_role" {
+  backend                          = vault_auth_backend.kubernetes.path
+  role_name                        = "am-backend-role"
+  bound_service_account_names      = ["default", "github-runner-sa", "am-backend-sa"]
+  bound_service_account_namespaces = ["*"]
+  token_policies                   = [vault_policy.am_backend_policy.name]
+  token_ttl                        = 31536000
+  token_max_ttl                    = 31536000
 }
 
 # ── Outputs for automation AppRole

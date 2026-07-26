@@ -91,6 +91,12 @@ variable "github_org_name" {
   default     = "AM-Portfolio"
 }
 
+variable "runner_labels" {
+  description = "Comma-separated list of additional labels for the runner"
+  type        = string
+  default     = ""
+}
+
 variable "vps_pass" {
   description = "VPS SSH password for remote image build"
   type        = string

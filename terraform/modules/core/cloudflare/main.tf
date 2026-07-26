@@ -18,21 +18,21 @@ terraform {
 locals {
   # All infrastructure subdomains that need DNS + tunnel routing
   service_routes = {
-    "authentik"    = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "vault"        = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "grafana"      = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "prometheus"   = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "influx"       = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "kafka"        = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "kafka-ui"     = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "mongo"        = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "pgadmin"      = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "redis"        = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "headlamp"     = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "traefik"      = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "rover"        = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "minio"        = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
-    "s3"           = { service = "http://traefik.infra.svc.cluster.local", port = 80 }
+    "authentik"    = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "vault"        = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "grafana"      = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "prometheus"   = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "influx"       = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "kafka"        = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "kafka-ui"     = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "mongo"        = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "pgadmin"      = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "redis"        = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "headlamp"     = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "traefik"      = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "rover"        = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "minio"        = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
+    "s3"           = { service = "https://traefik.infra.svc.cluster.local", port = 443 }
   }
 }
 
@@ -50,14 +50,6 @@ data "cloudflare_zone" "main" {
 #           If not, create a new one. This allows idempotent deploys.
 # ------------------------------------------------------------------------------
 
-# Lookup existing tunnel (only when tunnel_id is provided)
-data "cloudflare_zero_trust_tunnel_cloudflared" "existing" {
-  count      = var.cloudflare_tunnel_id != "" ? 1 : 0
-  account_id = var.cloudflare_account_id
-  name       = "am-kind-${var.environment}-tunnel"
-  is_deleted = false
-}
-
 # Create new tunnel (only when no tunnel_id is provided)
 resource "cloudflare_zero_trust_tunnel_cloudflared" "new" {
   count      = var.cloudflare_tunnel_id != "" ? 0 : 1
@@ -72,8 +64,8 @@ resource "cloudflare_zero_trust_tunnel_cloudflared" "new" {
 
 # Merge both paths into a single local for downstream use
 locals {
-  tunnel_id    = var.cloudflare_tunnel_id != "" ? data.cloudflare_zero_trust_tunnel_cloudflared.existing[0].id : cloudflare_zero_trust_tunnel_cloudflared.new[0].id
-  tunnel_cname = var.cloudflare_tunnel_id != "" ? "${data.cloudflare_zero_trust_tunnel_cloudflared.existing[0].id}.cfargotunnel.com" : "${cloudflare_zero_trust_tunnel_cloudflared.new[0].id}.cfargotunnel.com"
+  tunnel_id    = var.cloudflare_tunnel_id != "" ? var.cloudflare_tunnel_id : cloudflare_zero_trust_tunnel_cloudflared.new[0].id
+  tunnel_cname = var.cloudflare_tunnel_id != "" ? "${var.cloudflare_tunnel_id}.cfargotunnel.com" : "${cloudflare_zero_trust_tunnel_cloudflared.new[0].id}.cfargotunnel.com"
 }
 
 # ------------------------------------------------------------------------------
@@ -105,12 +97,21 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "modern" {
   tunnel_id  = local.tunnel_id
 
   config {
+    origin_request {
+      no_tls_verify = true
+    }
+
     # Route each subdomain to Traefik inside the cluster
     dynamic "ingress_rule" {
       for_each = local.service_routes
       content {
         hostname = "${ingress_rule.key}-${var.environment}.${var.root_domain}"
         service  = ingress_rule.value.service
+
+        origin_request {
+          http_host_header = "${ingress_rule.key}${var.environment == "local" ? "-local" : ""}.${var.root_domain}"
+          no_tls_verify    = true
+        }
       }
     }
 
@@ -158,7 +159,7 @@ resource "kubernetes_config_map" "cloudflared_config" {
             hostname = "${subdomain}-${var.environment}.${var.root_domain}"
             service  = cfg.service
             originRequest = {
-              httpHostHeader = "${subdomain}-${var.environment}.${var.root_domain}"
+              httpHostHeader = "${subdomain}${var.environment == "local" ? "-local" : ""}.${var.root_domain}"
               noTLSVerify    = true
               # Force standard HTTPS port in all forwarded headers to prevent port injection
               customRequestHeaders = {

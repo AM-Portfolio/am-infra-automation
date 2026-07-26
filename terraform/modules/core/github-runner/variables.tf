@@ -51,3 +51,9 @@ variable "namespace" {
   type        = string
   default     = "github-actions"
 }
+
+variable "runner_labels" {
+  description = "Comma-separated list of additional labels for the runner"
+  type        = string
+  default     = ""
+}

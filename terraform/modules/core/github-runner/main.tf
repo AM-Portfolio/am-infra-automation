@@ -149,7 +149,7 @@ resource "kubernetes_deployment" "github_runner" {
         labels = { app = "github-runner" }
         annotations = {
           "vault.hashicorp.com/agent-inject"                 = "true"
-          "vault.hashicorp.com/role"                         = "am-auth-role"
+          "vault.hashicorp.com/role"                         = "am-backend-role"
           "vault.hashicorp.com/agent-inject-secret-config"   = "secret/data/am-auth/preprod/master"
           "vault.hashicorp.com/agent-inject-template-config" = <<-EOT
             {{- with secret "secret/data/am-auth/preprod/master" -}}
@@ -183,6 +183,10 @@ resource "kubernetes_deployment" "github_runner" {
           env {
             name  = "ORG_NAME"
             value = var.github_org_name
+          }
+          env {
+            name  = "ADDITIONAL_LABELS"
+            value = var.runner_labels
           }
 
           volume_mount {

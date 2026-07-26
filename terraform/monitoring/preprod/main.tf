@@ -9,7 +9,7 @@ terraform {
 data "terraform_remote_state" "foundation" {
   backend = "local"
   config = {
-    path = "/data/am-state/foundation.tfstate"
+    path = "../../state/foundation.tfstate"
   }
 }
 
@@ -21,6 +21,7 @@ module "monitoring" {
   source = "./.."
 
   root_domain            = var.root_domain
+  environment            = var.environment
   namespace_monitoring   = data.terraform_remote_state.foundation.outputs.monitoring_ns
   namespace_infra        = data.terraform_remote_state.foundation.outputs.infra_ns
   

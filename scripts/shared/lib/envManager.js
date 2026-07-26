@@ -35,6 +35,7 @@ const VAULT_SECRET_MAP = {
   },
   'infra/platform': {
     github_pat: 'GITHUB_PAT',
+    runner_labels: 'RUNNER_LABELS',
   },
   'infra/admin': {
     headlamp_token: 'HEADLAMP_TOKEN',

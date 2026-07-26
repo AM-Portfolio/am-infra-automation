@@ -54,6 +54,13 @@ resource "kubernetes_namespace" "am_apps" {
   }
 }
 
+resource "kubernetes_service_account" "am_backend_sa" {
+  metadata {
+    name      = "am-backend-sa"
+    namespace = kubernetes_namespace.am_apps.metadata[0].name
+  }
+}
+
 # ── Outputs ────────────────────────────────────────────────────────────────────
 output "identity_ns"   { value = kubernetes_namespace.identity.metadata[0].name }
 output "infra_ns"      { value = kubernetes_namespace.infra.metadata[0].name }

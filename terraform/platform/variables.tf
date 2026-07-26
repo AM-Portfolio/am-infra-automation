@@ -60,3 +60,9 @@ variable "vps_ram_gb" {
   default     = 32
 }
 
+variable "runner_labels" {
+  description = "Comma-separated list of additional labels for the runner"
+  type        = string
+  default     = ""
+}
+

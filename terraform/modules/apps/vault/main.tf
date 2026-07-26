@@ -60,7 +60,7 @@ resource "helm_release" "vault" {
       serviceType = "NodePort"
     }
     injector = {
-      enabled = false
+      enabled = true
     }
     csi = {
       enabled = true

@@ -29,7 +29,11 @@ if [ -n "$GITHUB_PAT" ]; then
 fi
 
 if [ ! -f .runner ]; then
-  ./config.sh --url "$REPO_URL" --token "$RUNNER_TOKEN" --name "docker-runner-$(hostname)" --work "_work" --labels "self-hosted,Linux,X64,docker" --unattended --replace
+  LABELS="self-hosted,Linux,X64,docker"
+  if [ -n "$ADDITIONAL_LABELS" ]; then
+    LABELS="$LABELS,$ADDITIONAL_LABELS"
+  fi
+  ./config.sh --url "$REPO_URL" --token "$RUNNER_TOKEN" --name "docker-runner-$(hostname)" --work "_work" --labels "$LABELS" --unattended --replace
 fi
 
 cleanup() {

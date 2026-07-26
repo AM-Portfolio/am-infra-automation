@@ -7,5 +7,6 @@ module "github_runner" {
   github_org_name = var.github_org_name
   vps_pass        = var.vps_pass
   environment     = var.environment
+  runner_labels   = var.runner_labels
 }
 
