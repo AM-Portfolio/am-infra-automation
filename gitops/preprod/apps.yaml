@@ -121,8 +121,8 @@ items:
     spec:
       project: default
       sources:
-        - repoURL: 'https://github.com/am-asrax/am-logging.git'
-          targetRevision: main         # The branch, tag, or commit hash to track
+        - repoURL: 'https://github.com/AM-Portfolio/am-pipelines.git'
+          targetRevision: feature/isolated-runners         # The branch, tag, or commit hash to track
           path: helm/universal-chart            # Relative path to the Helm chart inside that repo
           # Optional: Add Helm values configuration if needed
           helm:
