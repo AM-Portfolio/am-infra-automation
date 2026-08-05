@@ -129,9 +129,6 @@ items:
             valueFiles:
               - '$values-source/helm/values.yaml'
               - '$values-source/helm/values.preprod.yaml'
-            parameters:
-              - name: global.image.registry
-                value: ghcr.io/am-asrax
         - repoURL: 'https://github.com/am-asrax/am-logging.git'
           targetRevision: main
           ref: values-source
