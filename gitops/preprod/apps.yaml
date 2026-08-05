@@ -111,3 +111,32 @@ items:
         automated:
           prune: true
           selfHeal: true
+
+  # 5. Logging Microservice
+  - apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: am-logging-preprod
+      namespace: argocd
+    spec:
+      project: default
+      sources:
+        - repoURL: 'https://github.com/am-asrax/am-logging.git'
+          targetRevision: main         # The branch, tag, or commit hash to track
+          path: helm/universal-chart            # Relative path to the Helm chart inside that repo
+          # Optional: Add Helm values configuration if needed
+          helm:
+            valueFiles:
+              - '$values-source/apps/am-logging/helm/values.yaml'
+              - '$values-source/apps/am-logging/helm/values.preprod.yaml'
+        - repoURL: 'https://github.com/am-asrax/am-logging.git'
+          targetRevision: main
+          ref: values-source
+      destination:
+        server: 'https://kubernetes.default.svc'
+        namespace: am-apps-preprod  # The preprod namespace to deploy into
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+  
