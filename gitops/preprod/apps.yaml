@@ -127,8 +127,8 @@ items:
           # Optional: Add Helm values configuration if needed
           helm:
             valueFiles:
-              - '$values-source/apps/am-logging/helm/values.yaml'
-              - '$values-source/apps/am-logging/helm/values.preprod.yaml'
+              - '$values-source/helm/values.yaml'
+              - '$values-source/helm/values.preprod.yaml'
         - repoURL: 'https://github.com/am-asrax/am-logging.git'
           targetRevision: main
           ref: values-source
