@@ -130,7 +130,7 @@ items:
               - '$values-source/helm/values.yaml'
               - '$values-source/helm/values.preprod.yaml'
         - repoURL: 'https://github.com/am-asrax/am-logging.git'
-          targetRevision: fix/skip-scans
+          targetRevision: main
           ref: values-source
       destination:
         server: 'https://kubernetes.default.svc'
