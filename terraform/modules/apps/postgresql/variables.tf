@@ -48,7 +48,49 @@ variable "pgadmin_password" {
 }
 
 variable "environment" {
-  description = "The deployment environment (local, prod, etc.)"
+  description = "The deployment environment (local, preprod, prod, dev, dr, obs)"
   type        = string
   default     = "local"
+
+  validation {
+    condition     = contains(["local", "preprod", "prod", "dev", "dr", "obs"], var.environment)
+    error_message = "environment must be one of: local, preprod, prod, dev, dr, obs."
+  }
+}
+
+variable "oidc_enabled" {
+  description = "Fetch Authentik OIDC from Vault and wire it into pgAdmin. Fleet: false."
+  type        = bool
+  default     = true
+}
+
+variable "enable_gateway" {
+  description = "Create Traefik IngressRoute. Fleet: false until Traefik exists."
+  type        = bool
+  default     = true
+}
+
+variable "cpu_request" {
+  type    = string
+  default = "50m"
+}
+
+variable "cpu_limit" {
+  type    = string
+  default = "500m"
+}
+
+variable "memory_request" {
+  type    = string
+  default = "256Mi"
+}
+
+variable "memory_limit" {
+  type    = string
+  default = "1Gi"
+}
+
+variable "storage" {
+  type    = string
+  default = "5Gi"
 }

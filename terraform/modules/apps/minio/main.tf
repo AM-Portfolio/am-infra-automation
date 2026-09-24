@@ -9,7 +9,7 @@ resource "kubernetes_persistent_volume" "minio_pv" {
   }
   spec {
     capacity = {
-      storage = "5Gi" # Standard start for object storage
+      storage = var.storage
     }
     volume_mode                      = "Filesystem"
     access_modes                     = ["ReadWriteOnce"]
@@ -21,6 +21,9 @@ resource "kubernetes_persistent_volume" "minio_pv" {
         type = "DirectoryOrCreate"
       }
     }
+  }
+  lifecycle {
+    ignore_changes = [spec[0].capacity]
   }
 }
 
@@ -34,10 +37,13 @@ resource "kubernetes_persistent_volume_claim" "minio_pvc" {
     storage_class_name = "manual-hostpath"
     resources {
       requests = {
-        storage = "5Gi"
+        storage = var.storage
       }
     }
     volume_name = kubernetes_persistent_volume.minio_pv.metadata[0].name
+  }
+  lifecycle {
+    ignore_changes = [spec[0].resources]
   }
 }
 
@@ -73,7 +79,7 @@ resource "kubernetes_stateful_set" "minio" {
       spec {
         container {
           name  = "minio"
-          image = "minio/minio:latest"
+          image = var.image
           args  = ["server", "/data", "--console-address", ":9001"]
           
           port {
@@ -116,8 +122,8 @@ resource "kubernetes_stateful_set" "minio" {
           }
           
           resources {
-            requests = { memory = "256Mi", cpu = "100m" }
-            limits   = { memory = "1Gi",   cpu = "1000m" }
+            requests = { memory = var.memory_request, cpu = var.cpu_request }
+            limits   = { memory = var.memory_limit, cpu = var.cpu_limit }
           }
         }
         volume {
@@ -129,6 +135,9 @@ resource "kubernetes_stateful_set" "minio" {
       }
     }
   }
+
+  wait_for_rollout = true
+  timeouts { create = "8m" }
 
   lifecycle {
     prevent_destroy = true
@@ -142,16 +151,19 @@ resource "kubernetes_service" "minio" {
     namespace = var.namespace
   }
   spec {
+    type     = "NodePort"
     selector = { app = "minio" }
     port {
       name        = "api"
       port        = 9000
       target_port = 9000
+      node_port   = 30900
     }
     port {
       name        = "console"
       port        = 9001
       target_port = 9001
+      node_port   = 30901
     }
   }
 }

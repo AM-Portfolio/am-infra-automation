@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# am-ops-guard: refuse kubectl delete for am-ops; passthrough for others.
+# Install as /usr/local/bin/kubectl with real binary at /usr/local/libexec/am-real/kubectl
+set -euo pipefail
+
+REAL="${AM_OPS_REAL_KUBECTL:-/usr/local/libexec/am-real/kubectl}"
+if [[ ! -x "$REAL" ]]; then
+  for cand in /opt/am-ops-guard/real/kubectl /usr/bin/kubectl; do
+    [[ -x "$cand" ]] && REAL="$cand" && break
+  done
+fi
+
+if [[ "$(id -un 2>/dev/null)" == "am-ops" ]]; then
+  for arg in "$@"; do
+    case "$arg" in
+      delete)
+        echo "am-ops-guard: REFUSED kubectl delete — day-2 am-ops cannot delete." >&2
+        echo "am-ops-guard: destructive Kind/cluster work = root break-glass only (break-glass-kind.sh / G1)." >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
+
+if [[ ! -x "${REAL:-}" ]]; then
+  echo "am-ops-guard: real kubectl not found" >&2
+  exit 127
+fi
+exec "$REAL" "$@"

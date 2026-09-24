@@ -19,14 +19,16 @@ resource "helm_release" "vault" {
       }
       ha = { enabled = false }
       standalone = { enabled = true }
-      service = {
-        enabled = true
-        type    = "NodePort"
-        nodePort = var.vault_node_port
-      }
+      service = merge(
+        {
+          enabled = true
+          type    = var.service_type
+        },
+        var.service_type == "NodePort" ? { nodePort = var.vault_node_port } : {}
+      )
       resources = {
-        requests = { memory = "128Mi", cpu = "50m" }
-        limits   = { memory = "256Mi", cpu = "200m" }
+        requests = { memory = var.memory_request, cpu = var.cpu_request }
+        limits   = { memory = var.memory_limit, cpu = var.cpu_limit }
       }
       readinessProbe = {
         enabled        = true
@@ -48,22 +50,22 @@ resource "helm_release" "vault" {
         storageClass = "standard"
       }
       dev = { enabled = false }
-      hostAliases = [
+      hostAliases = var.enable_host_aliases ? [
         {
-          ip = "10.96.208.223"
-          hostnames = [ "authentik.${var.root_domain}" ]
+          ip        = "10.96.208.223"
+          hostnames = ["authentik.${var.root_domain}"]
         }
-      ]
+      ] : []
     }
     ui = {
-      enabled = true
-      serviceType = "NodePort"
+      enabled     = true
+      serviceType = var.ui_service_type
     }
     injector = {
-      enabled = true
+      enabled = var.injector_enabled
     }
     csi = {
-      enabled = true
+      enabled = var.csi_enabled
     }
   })]
 

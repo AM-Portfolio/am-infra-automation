@@ -8,6 +8,8 @@
 # ==============================================================================
 
 resource "null_resource" "vault_unsealer" {
+  count = var.enable_unsealer ? 1 : 0
+
   triggers = {
     timestamp = timestamp()
   }

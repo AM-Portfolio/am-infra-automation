@@ -70,3 +70,71 @@ variable "kubeconfig_path" {
   type        = string
   default     = ""
 }
+
+variable "injector_enabled" {
+  description = "Enable Vault Agent Injector. Fleet: false (CSI later on apps)."
+  type        = bool
+  default     = true
+}
+
+variable "csi_enabled" {
+  description = "Enable Vault CSI provider. Fleet infra: false."
+  type        = bool
+  default     = true
+}
+
+variable "service_type" {
+  description = "Vault server Service type. Fleet: ClusterIP."
+  type        = string
+  default     = "NodePort"
+}
+
+variable "ui_service_type" {
+  description = "Vault UI Service type. Fleet: ClusterIP."
+  type        = string
+  default     = "NodePort"
+}
+
+variable "enable_unsealer" {
+  description = "Run the bash local-exec unsealer. Fleet on Windows: false."
+  type        = bool
+  default     = true
+}
+
+variable "enable_watcher" {
+  description = "Deploy the in-cluster unseal watcher. Fleet: false until unseal keys exist."
+  type        = bool
+  default     = true
+}
+
+variable "enable_host_aliases" {
+  description = "Add Authentik hostAliases on the Vault pod. Fleet: false."
+  type        = bool
+  default     = true
+}
+
+variable "enable_gateway" {
+  description = "Create Traefik IngressRoute for Vault UI/API. Requires Phase 2 edge first."
+  type        = bool
+  default     = false
+}
+
+variable "cpu_request" {
+  type    = string
+  default = "50m"
+}
+
+variable "cpu_limit" {
+  type    = string
+  default = "200m"
+}
+
+variable "memory_request" {
+  type    = string
+  default = "128Mi"
+}
+
+variable "memory_limit" {
+  type    = string
+  default = "256Mi"
+}

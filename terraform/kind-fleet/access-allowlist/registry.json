@@ -1,0 +1,18 @@
+{
+  "entries": [
+    {
+      "cidr": "172.19.0.0/16",
+      "apps": ["data-plane", "obs", "platform-ops", "store-uis"],
+      "by": "builtin",
+      "reason": "Kind docker network",
+      "expires": null
+    },
+    {
+      "cidr": "10.77.1.0/24",
+      "apps": ["data-plane", "obs", "platform-ops", "store-uis"],
+      "by": "builtin",
+      "reason": "WireGuard mesh",
+      "expires": null
+    }
+  ]
+}

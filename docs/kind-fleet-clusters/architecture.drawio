@@ -1,0 +1,331 @@
+<mxfile host="app.diagrams.net" agent="am-architecture-drawio">
+  <diagram id="context" name="Context">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="Context: users hit asrax.in via Cloudflare. One env per host. PP/PP-DR out of scope." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="720" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="actor" value="User / operator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="cf" value="Cloudflare&#10;DNS + tunnels&#10;(MCP user-cloudflare)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="210" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="vps1" value="VPS1 prod&#10;3 Kind clusters" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="80" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="vps2" value="VPS2 obs / Grafana&#10;am-obs only" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="180" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="vps3" value="VPS3 prod-DR&#10;3 Kind clusters" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="280" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="local" value="Laptop Kind&#10;local = dev" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="380" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" value="R2 backups&#10;prod/ dumps + tfstate copies" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="180" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="asrax" value="~/.asrax&#10;creds + kube + MCP sync" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="380" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="HTTPS am/auth/grafana" style="endArrow=block;html=1;" edge="1" parent="1" source="actor" target="cf">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="prod tunnel" style="endArrow=block;html=1;" edge="1" parent="1" source="cf" target="vps1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="promote tunnel" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="cf" target="vps3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="grafana.asrax.in" style="endArrow=block;html=1;" edge="1" parent="1" source="cf" target="vps2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="dump/restore" style="endArrow=block;html=1;" edge="1" parent="1" source="vps1" target="r2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="disaster restore only" style="endArrow=block;html=1;" edge="1" parent="1" source="r2" target="vps3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="MCP after each layer" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="local" target="asrax">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="business" name="BusinessFlow">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="BusinessFlow: operator layer loop + user same-login UIs. Not service mesh." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="720" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="p" value="1. Prereq verify&#10;(dumps / prior gate)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="i" value="2. Implement&#10;one layer only" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="100" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="m" value="3. Load ~/.asrax&#10;am ai mcp-sync" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="100" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="c" value="4. MCP load/correct&#10;data" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="640" y="100" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v" value="5. MCP test&#10;one real call" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="840" y="100" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ok" value="6. Next phase" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="100" width="140" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="fail" value="Fail: stay on this phase&#10;fix implement" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="840" y="240" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="u1" value="User opens am.asrax.in" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="380" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="u2" value="Same Keycloak login&#10;am-realm" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="380" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="u3" value="Role opens Grafana / MinIO / Argo&#10;or denied" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="380" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="pass" style="endArrow=block;html=1;" edge="1" parent="1" source="p" target="i">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="applied" style="endArrow=block;html=1;" edge="1" parent="1" source="i" target="m">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="pointed" style="endArrow=block;html=1;" edge="1" parent="1" source="m" target="c">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="ready" style="endArrow=block;html=1;" edge="1" parent="1" source="c" target="v">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="pass" style="endArrow=block;html=1;" edge="1" parent="1" source="v" target="ok">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="fail" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="v" target="fail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="retry implement" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="fail" target="i">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="HTTPS" style="endArrow=block;html=1;" edge="1" parent="1" source="u1" target="u2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="OIDC roles" style="endArrow=block;html=1;" edge="1" parent="1" source="u2" target="u3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="containers" name="Containers">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="Containers: edges labeled with host / port / protocol. One host = three clusters except VPS2 (obs)." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="800" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="cf" value="Cloudflare&#10;CNAME *.cfargotunnel.com" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="200" width="150" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="apps" value="am-{env}-apps&#10;Traefik + am-apps-{env}" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="80" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="plat" value="am-{env}-platform&#10;Keycloak + Argo" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="200" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="infra" value="am-{env}-infra&#10;Traefik + cloudflared first&#10;then DBs + Vault + MinIO" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="320" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="obs" value="am-obs VPS2&#10;Grafana Loki Prom" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="440" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="HTTPS Host(am.asrax.in)" style="endArrow=block;html=1;" edge="1" parent="1" source="cf" target="apps">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="HTTPS Host(auth|argocd.asrax.in)" style="endArrow=block;html=1;" edge="1" parent="1" source="cf" target="plat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="HTTPS tunnel → Traefik :80 Host(vault|minio|influx)" style="endArrow=block;html=1;" edge="1" parent="1" source="cf" target="infra">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="HTTPS Host(grafana.asrax.in)" style="endArrow=block;html=1;" edge="1" parent="1" source="cf" target="obs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="OIDC /realms/am-realm" style="endArrow=block;html=1;" edge="1" parent="1" source="apps" target="plat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="host:8888-8891 / Vault :8200" style="endArrow=block;html=1;" edge="1" parent="1" source="apps" target="infra">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="host:8888-8891 Keycloak DB" style="endArrow=block;html=1;" edge="1" parent="1" source="plat" target="infra">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="Alloy remote_write :8910/:8911" style="endArrow=block;html=1;" edge="1" parent="1" source="apps" target="obs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="OIDC grafana → auth.asrax.in" style="endArrow=block;html=1;" edge="1" parent="1" source="obs" target="plat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="sequence" name="Sequence">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="Sequence: layer gate happy path and reject. Failover happy path." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="720" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="op" value="Operator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="80" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="tf" value="Terraform/Kind" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="80" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ax" value="~/.asrax + mcp-sync" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="80" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp" value="MCP tools" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="80" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="1 apply one layer" style="endArrow=block;html=1;" edge="1" parent="1" source="op" target="tf">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="75" y="180" as="sourcePoint" />
+            <mxPoint x="265" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s2" value="2 write kubeconfig/URLs" style="endArrow=block;html=1;" edge="1" parent="1" source="tf" target="ax">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="330" y="220" as="sourcePoint" />
+            <mxPoint x="475" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s3" value="3 health + correct data" style="endArrow=block;html=1;" edge="1" parent="1" source="ax" target="mcp">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="260" as="sourcePoint" />
+            <mxPoint x="680" y="260" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s4" value="4 pass → next phase" style="endArrow=block;html=1;" edge="1" parent="1" source="mcp" target="op">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="680" y="320" as="sourcePoint" />
+            <mxPoint x="90" y="320" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s5" value="5 Reject: MCP fail → stay" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="mcp" target="tf">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="680" y="400" as="sourcePoint" />
+            <mxPoint x="265" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s6" value="6 Failover: CF MCP retarget am+auth" style="endArrow=block;html=1;" edge="1" parent="1" source="op" target="mcp">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="75" y="480" as="sourcePoint" />
+            <mxPoint x="680" y="480" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s7" value="Phase2: kind → Traefik+tunnel → stores → IngressRoutes → domain test. Skip Edge = reject." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="540" width="820" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="data" name="DataIdentity">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="DataIdentity: who owns ids and state. No money ledger." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="560" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="kc" value="Keycloak am-realm&#10;user id = Keycloak sub&#10;roles = am-admin|ops|viewer|user&#10;clients = modern-ui,gateway,minio,grafana,argocd" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="320" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="stores" value="VPS1 am-prod-infra (writer)&#10;mongo/pg/redis/kafka/vault/minio&#10;env token = prod only" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="400" y="80" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" value="R2 prod/&#10;object keys mongo|postgres|vault|tfstate&#10;not a live DB" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="240" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="dr" value="VPS3 am-dr-infra&#10;PG standby + Mongo secondary (WG)&#10;app NS am-apps-dr" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="400" y="240" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="tf" value="tfstate path&#10;VPS /data/am-state/terraform/{env}/{role}&#10;local ~/.asrax/tfstate/local/{role}" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="200" y="380" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="dump" style="endArrow=block;html=1;" edge="1" parent="1" source="stores" target="r2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="restore" style="endArrow=block;html=1;" edge="1" parent="1" source="r2" target="dr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="security" name="SecurityTrust">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="SecurityTrust: Keycloak-only SSO; VPS am-ops no sudo/delete; admin local only." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="700" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="idp" value="Keycloak&#10;auth.asrax.in /realms/am-realm" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="100" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="uis" value="UIs + APIs&#10;Bearer / OIDC" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="360" y="100" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ops" value="Phase 5 first: SSH test then am-ops&#10;create/update/patch only&#10;no sudo no delete; then all VPS work" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="240" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="loc" value="Laptop admin&#10;destroy only am-dev-*" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="360" y="240" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="iso" value="Isolation: no foreign env NS on a host; no Authentik; no kagent" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="380" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="Bearer JWT" style="endArrow=block;html=1;" edge="1" parent="1" source="idp" target="uis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="failures" name="Failures">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="Failures: trigger → system → operator/user sees." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="560" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="f1" value="VPS1 down&#10;→ CF LB am+auth to VPS3&#10;→ promote PG/Mongo; same JWT" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="f2" value="Keycloak down&#10;→ all UI login fail&#10;→ Grafana up but cannot sign in" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="340" y="80" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="f3" value="MCP still on old URL&#10;→ gate fail&#10;→ do not start next layer" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="200" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="f4" value="Agent sudo/delete on VPS&#10;→ OS + RBAC deny&#10;→ only laptop may destroy local" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="340" y="200" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="f5" value="am-user opens Grafana&#10;→ OIDC role none&#10;→ access denied" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="f6" value="Split-brain after promote&#10;→ do not write VPS1&#10;→ failback only after freeze" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="340" y="320" width="260" height="90" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

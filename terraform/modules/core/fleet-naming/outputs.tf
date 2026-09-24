@@ -1,0 +1,17 @@
+output "env" { value = local.env }
+output "domain" { value = local.domain }
+output "apps_ns" { value = local.apps_ns }
+output "agents_ns" { value = local.agents_ns }
+output "bound_namespaces" { value = [local.apps_ns, local.agents_ns] }
+output "vault_url" { value = local.vault_url }
+output "vault_host" { value = local.vault_host }
+output "vault_auth_mount" { value = local.vault_auth_mount }
+output "vault_role" { value = local.vault_role }
+output "vault_policy" { value = local.vault_policy }
+output "vault_data_prefix" { value = local.vault_data_prefix }
+output "ui_host" { value = local.ui_host }
+output "auth_host" { value = local.auth_host }
+output "middleware_cors" { value = local.middleware_cors }
+output "middleware_strip" { value = local.middleware_strip }
+output "apps_cluster_name" { value = local.apps_cluster_name }
+output "kubeconfig_apps" { value = local.kubeconfig_apps }

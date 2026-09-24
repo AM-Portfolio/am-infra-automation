@@ -3,10 +3,11 @@
 # ------------------------------------------------------------------------------
 
 locals {
-  domain_suffix = var.environment == "local" ? "-local" : ""
+  domain_suffix = var.environment == "prod" ? "" : "-${var.environment}"
 }
 
 resource "kubectl_manifest" "ingressroute_redis" {
+  count     = var.enable_gateway ? 1 : 0
   yaml_body = <<YAML
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -18,7 +19,7 @@ spec:
     - web
     - websecure
   routes:
-    - match: Host(`redis${local.domain_suffix}.${var.root_domain}`)
+    - match: Host(`redis-ui${local.domain_suffix}.${var.root_domain}`)
       kind: Rule
       services:
         - name: redis-commander

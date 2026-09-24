@@ -23,6 +23,7 @@
 # ── RBAC ─────────────────────────────────────────────────────────────────────
 
 resource "kubernetes_service_account" "vault_watcher" {
+  count = var.enable_watcher ? 1 : 0
   metadata {
     name      = "vault-unsealer-watcher"
     namespace = var.namespace
@@ -35,6 +36,7 @@ resource "kubernetes_service_account" "vault_watcher" {
 }
 
 resource "kubernetes_role" "vault_watcher" {
+  count = var.enable_watcher ? 1 : 0
   metadata {
     name      = "vault-unsealer-watcher"
     namespace = var.namespace
@@ -49,6 +51,7 @@ resource "kubernetes_role" "vault_watcher" {
 }
 
 resource "kubernetes_role_binding" "vault_watcher" {
+  count = var.enable_watcher ? 1 : 0
   metadata {
     name      = "vault-unsealer-watcher"
     namespace = var.namespace
@@ -56,11 +59,11 @@ resource "kubernetes_role_binding" "vault_watcher" {
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "Role"
-    name      = kubernetes_role.vault_watcher.metadata[0].name
+    name      = kubernetes_role.vault_watcher[0].metadata[0].name
   }
   subject {
     kind      = "ServiceAccount"
-    name      = kubernetes_service_account.vault_watcher.metadata[0].name
+    name      = kubernetes_service_account.vault_watcher[0].metadata[0].name
     namespace = var.namespace
   }
 }
@@ -68,6 +71,7 @@ resource "kubernetes_role_binding" "vault_watcher" {
 # ── WATCHER DEPLOYMENT ────────────────────────────────────────────────────────
 
 resource "kubernetes_deployment" "vault_watcher" {
+  count = var.enable_watcher ? 1 : 0
   metadata {
     name      = "vault-unsealer-watcher"
     namespace = var.namespace
@@ -100,7 +104,7 @@ resource "kubernetes_deployment" "vault_watcher" {
       }
 
       spec {
-        service_account_name = kubernetes_service_account.vault_watcher.metadata[0].name
+        service_account_name = kubernetes_service_account.vault_watcher[0].metadata[0].name
 
         # ── Init: wait for Vault pod to be reachable before starting the loop ──
         init_container {
@@ -259,5 +263,5 @@ resource "kubernetes_deployment" "vault_watcher" {
 
   # Wait for the first unseal (null_resource.vault_unsealer) and the secret to
   # exist before deploying the watcher. The watcher then owns all future unseals.
-  depends_on = [null_resource.vault_unsealer]
+  depends_on = [helm_release.vault]
 }

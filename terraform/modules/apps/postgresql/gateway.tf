@@ -3,10 +3,11 @@
 # ------------------------------------------------------------------------------
 
 locals {
-  domain_suffix = var.environment == "local" ? "-local" : ""
+  domain_suffix = var.environment == "prod" ? "" : "-${var.environment}"
 }
 
 resource "kubectl_manifest" "ingressroute_postgres" {
+  count     = var.enable_gateway ? 1 : 0
   yaml_body = <<YAML
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
