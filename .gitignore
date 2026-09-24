@@ -119,3 +119,7 @@ terraform/current_state_list*.txt
 
 # Zero-trust generated host firewall script
 terraform/kind-fleet/access-allowlist/generated-allowlist.ps1
+
+# Kind-fleet local artifacts (never commit)
+terraform/kind-fleet/**/tfplan*
+terraform/kind-fleet/**/am-*-config
