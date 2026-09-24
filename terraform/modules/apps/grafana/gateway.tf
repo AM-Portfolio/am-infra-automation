@@ -1,8 +1,10 @@
 # ------------------------------------------------------------------------------
-# Grafana Routing & Gateway
+# Grafana Routing & Gateway (same-cluster Traefik only)
 # ------------------------------------------------------------------------------
 
 resource "kubectl_manifest" "ingressroute_grafana" {
+  count = var.enable_gateway ? 1 : 0
+
   yaml_body = <<YAML
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -19,9 +21,7 @@ spec:
       services:
         - name: grafana
           port: 80
-      middlewares:
-        - name: ${var.infra_namespace}-force-https-proto@kubernetescrd
-        - name: ${var.infra_namespace}-vary-referer@kubernetescrd
-        - name: ${var.infra_namespace}-global-cors@kubernetescrd
 YAML
+
+  depends_on = [helm_release.grafana]
 }

@@ -3,11 +3,12 @@
 # ------------------------------------------------------------------------------
 
 locals {
-  domain_suffix = var.environment == "local" ? "-local" : ""
+  domain_suffix = var.environment == "prod" ? "" : "-${var.environment}"
 }
 
 # 1. Console Routing (User Interface)
 resource "kubectl_manifest" "ingressroute_minio_console" {
+  count     = var.enable_gateway ? 1 : 0
   yaml_body = <<YAML
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -29,6 +30,7 @@ YAML
 
 # 2. API Routing (S3 Endpoint)
 resource "kubectl_manifest" "ingressroute_minio_api" {
+  count     = var.enable_gateway ? 1 : 0
   yaml_body = <<YAML
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute

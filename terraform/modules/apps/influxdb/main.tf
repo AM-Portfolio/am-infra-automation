@@ -17,9 +17,27 @@ resource "helm_release" "influxdb" {
     }
     persistence = {
       enabled      = true
-      size         = "2Gi"
+      size         = var.storage
       storageClass = "standard"
     }
+    resources = {
+      requests = {
+        cpu    = var.cpu_request
+        memory = var.memory_request
+      }
+      limits = {
+        cpu    = var.cpu_limit
+        memory = var.memory_limit
+      }
+    }
+    service = {
+      type     = "NodePort"
+      port     = 80
+      nodePort = 30806
+    }
+    env = [
+      { name = "INFLUXD_STORAGE_CACHE_MAX_MEMORY_SIZE", value = "536870912" }
+    ]
     # ENTERPRISE PREVENTION LOCK: Do NOT delete the Influx DB accidentally
     annotations = {
       "helm.sh/resource-policy" = "keep"

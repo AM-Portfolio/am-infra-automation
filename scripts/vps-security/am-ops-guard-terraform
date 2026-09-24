@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# am-ops-guard: refuse terraform destroy for am-ops; passthrough for others.
+set -euo pipefail
+
+REAL="${AM_OPS_REAL_TERRAFORM:-/usr/local/libexec/am-real/terraform}"
+if [[ ! -x "$REAL" ]]; then
+  for cand in /opt/am-ops-guard/real/terraform /usr/bin/terraform /bin/terraform; do
+    [[ -x "$cand" ]] && REAL="$cand" && break
+  done
+fi
+
+if [[ "$(id -un 2>/dev/null)" == "am-ops" ]]; then
+  for arg in "$@"; do
+    case "$arg" in
+      destroy|-destroy)
+        echo "am-ops-guard: REFUSED terraform destroy — day-2 am-ops cannot destroy." >&2
+        echo "am-ops-guard: break-glass / laptop admin only." >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
+
+if [[ ! -x "${REAL:-}" ]]; then
+  echo "am-ops-guard: terraform not installed on this host" >&2
+  exit 127
+fi
+exec "$REAL" "$@"

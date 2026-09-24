@@ -1,0 +1,126 @@
+name: Register Access IP
+
+# Ops-only: add/remove CIDR for selected Access app keys → PR to registry.json
+# Environment: zero-trust-ip (configure required reviewers in GitHub Settings)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: add or remove
+        required: true
+        type: choice
+        options:
+          - add
+          - remove
+      cidr:
+        description: CIDR (e.g. 203.0.113.10/32)
+        required: true
+        type: string
+      apps:
+        description: Comma-separated app keys (product-ui,obs,platform-ops,platform-tools,store-uis,data-plane)
+        required: true
+        type: string
+      reason:
+        description: Why this IP is needed
+        required: true
+        type: string
+      expires:
+        description: Optional expiry YYYY-MM-DD
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-registry:
+    runs-on: ubuntu-latest
+    environment: zero-trust-ip
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate CIDR and apps
+        env:
+          CIDR: ${{ inputs.cidr }}
+          APPS: ${{ inputs.apps }}
+          ACTION: ${{ inputs.action }}
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import ipaddress, os, sys
+          cidr = os.environ["CIDR"].strip()
+          apps = [a.strip() for a in os.environ["APPS"].split(",") if a.strip()]
+          allowed = {"product-ui","obs","platform-ops","platform-tools","store-uis","data-plane"}
+          try:
+              net = ipaddress.ip_network(cidr, strict=False)
+          except ValueError as e:
+              print(f"Invalid CIDR: {e}"); sys.exit(1)
+          if net.prefixlen < 24 and not str(net).startswith(("172.19.", "10.77.")):
+              print("Refusing broad prefix (< /24) except Kind/WG builtins"); sys.exit(1)
+          if str(net) in ("0.0.0.0/0", "::/0"):
+              print("Refusing world-open CIDR"); sys.exit(1)
+          bad = set(apps) - allowed
+          if bad:
+              print(f"Unknown app keys: {bad}"); sys.exit(1)
+          if not apps:
+              print("Need at least one app key"); sys.exit(1)
+          print("ok", cidr, apps)
+          PY
+
+      - name: Patch registry.json
+        env:
+          CIDR: ${{ inputs.cidr }}
+          APPS: ${{ inputs.apps }}
+          ACTION: ${{ inputs.action }}
+          REASON: ${{ inputs.reason }}
+          EXPIRES: ${{ inputs.expires }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          python3 <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path("terraform/kind-fleet/access-allowlist/registry.json")
+          data = json.loads(path.read_text())
+          entries = data.setdefault("entries", [])
+          cidr = os.environ["CIDR"].strip()
+          apps = [a.strip() for a in os.environ["APPS"].split(",") if a.strip()]
+          action = os.environ["ACTION"]
+          if action == "remove":
+              data["entries"] = [e for e in entries if e.get("cidr") != cidr]
+          else:
+              entries = [e for e in entries if e.get("cidr") != cidr]
+              exp = os.environ.get("EXPIRES") or None
+              if exp == "":
+                  exp = None
+              entries.append({
+                  "cidr": cidr,
+                  "apps": apps,
+                  "by": os.environ["ACTOR"],
+                  "reason": os.environ["REASON"],
+                  "expires": exp,
+              })
+              data["entries"] = entries
+          path.write_text(json.dumps(data, indent=2) + "\n")
+          print(path.read_text())
+          PY
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: zero-trust/ip-${{ github.run_id }}
+          title: "chore(zero-trust): ${{ inputs.action }} ${{ inputs.cidr }}"
+          body: |
+            Access allowlist update via `register-access-ip` workflow.
+
+            - action: `${{ inputs.action }}`
+            - cidr: `${{ inputs.cidr }}`
+            - apps: `${{ inputs.apps }}`
+            - reason: ${{ inputs.reason }}
+            - by: @${{ github.actor }}
+
+            After merge: `terraform apply` on `kind-fleet/dev/edge` (zero-trust-access + data-plane-ip-allowlist).
+          labels: zero-trust
+          commit-message: "chore(zero-trust): ${{ inputs.action }} ${{ inputs.cidr }}"

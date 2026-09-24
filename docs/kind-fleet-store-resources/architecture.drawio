@@ -1,0 +1,241 @@
+<mxfile host="app.diagrams.net" agent="am-architecture-drawio">
+  <diagram id="context" name="Context">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="Context: operator sizes infra stores per env. No modern-ui. No new cluster." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="720" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="actor" value="Operator&#10;(you)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="200" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sys" value="AM Kind fleet&#10;store-sizing&#10;(am-infra-automation)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="170" width="220" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="dev" value="Laptop Docker&#10;am-dev-infra&#10;~dev row" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="60" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="prod" value="VPS1 ~64 GB&#10;am-prod-infra&#10;~prod row" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="170" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="dr" value="VPS3 32 GB&#10;am-dr-infra&#10;limits=prod, req~70%" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="280" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="reviews PLAN table" style="endArrow=block;html=1;" edge="1" parent="1" source="actor" target="sys">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="terraform apply stores (after confirm)" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="sys" target="dev">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="later VPS apply (re-ask)" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="sys" target="prod">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="later VPS apply (re-ask)" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="sys" target="dr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="business" name="BusinessFlow">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="BusinessFlow: operator reviews sizes, then kube-scheduler places store pods. Not S2S." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="800" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="1. Open PLAN table&#10;dev / prod / dr rows" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="2. Edit a cell&#10;or approve as-is" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="120" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="3. Confirm Execute&#10;laptop dev only" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="120" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" value="4. Pods Running&#10;resources = dev row" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="120" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s5" value="Reject: prod sizes&#10;on laptop → Pending&#10;or wrapper validation fail" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="260" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="reads numbers" style="endArrow=block;html=1;" edge="1" parent="1" source="s1" target="s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="approved / implement" style="endArrow=block;html=1;" edge="1" parent="1" source="s2" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="terraform apply kind-fleet/dev/stores" style="endArrow=block;html=1;" edge="1" parent="1" source="s3" target="s4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="wrong env map" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="s3" target="s5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="containers" name="Containers">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="Containers: every edge labeled. store-sizing feeds existing store modules." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="700" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="wrap" value="kind-fleet/&lt;env&gt;/stores&#10;local.env = folder" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="160" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="size" value="store-sizing&#10;var.environment" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="160" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="apps" value="modules/apps/*&#10;PG Mongo Redis&#10;Kafka Influx MinIO Vault" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="580" y="140" width="200" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="kube-apiserver&#10;am-&lt;env&gt;-infra" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="860" y="160" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="module.sizing environment=local.env" style="endArrow=block;html=1;" edge="1" parent="1" source="wrap" target="size">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="var.resources = sizing.&lt;store&gt;" style="endArrow=block;html=1;" edge="1" parent="1" source="size" target="apps">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="PATCH STS / Helm values resources" style="endArrow=block;html=1;" edge="1" parent="1" source="apps" target="api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="sequence" name="Sequence">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="Sequence: Create sizing → Happy apply → Reject prod-on-dev." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="640" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a_op" value="Operator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="80" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="a_tf" value="Terraform&#10;wrapper" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="70" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="a_sz" value="store-sizing" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="70" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="a_k8s" value="kube-scheduler" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="660" y="70" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="1 Create/apply env=dev" style="endArrow=block;html=1;" edge="1" parent="1" source="a_op" target="a_tf">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="95" y="200" as="sourcePoint" />
+            <mxPoint x="325" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s2" value="2 lookup map[dev]" style="endArrow=block;html=1;" edge="1" parent="1" source="a_tf" target="a_sz">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="390" y="240" as="sourcePoint" />
+            <mxPoint x="525" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s3" value="3 Happy: STS resources=dev row" style="endArrow=block;html=1;" edge="1" parent="1" source="a_sz" target="a_k8s">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="590" y="280" as="sourcePoint" />
+            <mxPoint x="730" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s4" value="4 Running if node Allocatable ≥ requests" style="endArrow=block;html=1;" edge="1" parent="1" source="a_k8s" target="a_k8s">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="800" y="200" as="sourcePoint" />
+            <mxPoint x="800" y="320" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s5" value="5 Reject: env=prod on laptop folder → validate fail; or Pending Insufficient memory" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="a_tf" target="a_k8s">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="325" y="400" as="sourcePoint" />
+            <mxPoint x="730" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="data" name="DataIdentity">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="DataIdentity: env token owns the sizing row. No user ledger." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="640" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t" value="Key&#10;environment = dev|prod|dr&#10;(folder local.env)&#10;not vps_ram_gb" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="120" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="p" value="Value per store&#10;cpu_request / cpu_limit&#10;memory_request / memory_limit&#10;storage&#10;redis_maxmemory?" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="360" y="110" width="260" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="ev" value="Runtime projection&#10;Pod.spec.containers[].resources&#10;PV.spec.capacity.storage&#10;Redis maxmemory" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="210" y="320" width="260" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="map lookup" style="endArrow=block;html=1;" edge="1" parent="1" source="t" target="p">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="rendered by module" style="endArrow=block;html=1;" edge="1" parent="1" source="p" target="ev">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="security" name="SecurityTrust">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="SecurityTrust: no secret change. Guard is env folder + module defaults=dev." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="720" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="idp" value="No IdP change&#10;OIDC stays off on fleet stores" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="110" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="Wrapper guard&#10;local.env == folder name" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="110" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="int" value="Module default = dev row&#10;omit var → laptop-safe" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="640" y="110" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="iso" value="Isolation: each host TF state&#10;prod numbers never written unless that wrapper applies" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="250" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="does not issue tokens" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="idp" target="api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="defaults protect" style="endArrow=block;html=1;" edge="1" parent="1" source="api" target="int">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="failures" name="Failures">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n" value="Failures: trigger → system → operator sees. No end-user cash." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="640" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="f1" value="Trigger: prod row on laptop&#10;→ Pending Insufficient memory&#10;→ operator describe pod" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="f2" value="Trigger: Redis maxmemory ≥ limit&#10;→ OOMKilled&#10;→ no apply (validation)" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="320" y="100" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="f3" value="Trigger: resize bound hostPath PV&#10;→ PVC Pending / orphan&#10;→ skip this slice" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="600" y="100" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="f4" value="Trigger: DR requests = full prod + apps on 32 GB&#10;→ later apps Pending&#10;→ keep DR requests ~70%" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="320" y="250" width="280" height="110" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

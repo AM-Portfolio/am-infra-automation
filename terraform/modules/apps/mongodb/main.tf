@@ -9,7 +9,7 @@ resource "kubernetes_persistent_volume" "mongo_pv" {
   }
   spec {
     capacity = {
-      storage = "2Gi"
+      storage = var.storage
     }
     volume_mode                      = "Filesystem"
     access_modes                     = ["ReadWriteOnce"]
@@ -21,6 +21,9 @@ resource "kubernetes_persistent_volume" "mongo_pv" {
         type = "DirectoryOrCreate"
       }
     }
+  }
+  lifecycle {
+    ignore_changes = [spec[0].capacity]
   }
 }
 
@@ -34,10 +37,13 @@ resource "kubernetes_persistent_volume_claim" "mongo_pvc" {
     storage_class_name = "manual-hostpath"
     resources {
       requests = {
-        storage = "2Gi"
+        storage = var.storage
       }
     }
     volume_name = kubernetes_persistent_volume.mongo_pv.metadata[0].name
+  }
+  lifecycle {
+    ignore_changes = [spec[0].resources]
   }
 }
 
@@ -55,6 +61,7 @@ resource "helm_release" "mongodb" {
       rootPassword  = var.mongo_root_password
     }
     architecture = "standalone"
+    strategyType = "Recreate"
     nodeSelector = {
       role = "infra"
     }
@@ -67,6 +74,19 @@ resource "helm_release" "mongodb" {
       enabled       = true
       existingClaim = kubernetes_persistent_volume_claim.mongo_pvc.metadata[0].name
     }
+    resources = {
+      requests = {
+        cpu    = var.cpu_request
+        memory = var.memory_request
+      }
+      limits = {
+        cpu    = var.cpu_limit
+        memory = var.memory_limit
+      }
+    }
+    extraFlags = [
+      "--wiredTigerCacheSizeGB=${var.wired_tiger_cache_gb}"
+    ]
     volumePermissions = {
       enabled = true
       image = {

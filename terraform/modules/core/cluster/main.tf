@@ -1,7 +1,5 @@
 # ==============================================================================
-# KinD Cluster Provisioning
-# ==============================================================================
-# Declaratively manages the Kubernetes cluster on the VPS.
+# KinD cluster — fleet names are computed, never am-preprod / am-local
 # ==============================================================================
 
 terraform {
@@ -14,83 +12,59 @@ terraform {
 }
 
 resource "kind_cluster" "this" {
-  name           = var.cluster_name
+  name           = local.cluster_name
   wait_for_ready = true
-  
+
+  lifecycle {
+    precondition {
+      condition     = local.env_role_ok
+      error_message = "env=obs requires cluster_role=obs (name am-obs). Other envs cannot use cluster_role=obs."
+    }
+    precondition {
+      condition     = local.node_shape_ok
+      error_message = "prod must be node_shape=two. dev, dr, and obs must be node_shape=one."
+    }
+    precondition {
+      condition     = local.api_port_ok
+      error_message = "infra/obs API must be 6443, apps 6444, platform 6445."
+    }
+    precondition {
+      condition     = !contains(["am-preprod", "am-local"], local.cluster_name)
+      error_message = "Refusing Kind name am-preprod or am-local."
+    }
+  }
+
   kind_config {
     kind        = "Cluster"
     api_version = "kind.x-k8s.io/v1alpha4"
 
     networking {
-      api_server_address = "127.0.0.1"
-      api_server_port    = 6443
+      api_server_address = var.api_server_address
+      api_server_port    = local.api_server_port
     }
 
-    # Node 1: Control plane + databases/infra services
-    node {
-      role = "control-plane"
-      kubeadm_config_patches = concat(
-        [
-          <<-EOT
-          kind: InitConfiguration
-          nodeRegistration:
-            kubeletExtraArgs:
-              node-labels: "role=infra"
-          EOT
-        ],
-        [
-          <<-EOT
-          kind: ClusterConfiguration
-          etcd:
-            local:
-              extraArgs:
-                heartbeat-interval: "500"
-                election-timeout: "2500"
-          EOT
-        ],
-        var.vps_ip != "" ? [
-          <<-EOT
-          kind: ClusterConfiguration
-          apiServer:
-            certSANs:
-              - "${var.vps_ip}"
-          EOT
-        ] : []
-      )
-      extra_mounts {
-        host_path      = "/mnt/am-infra/data"
-        container_path = "/mnt/am-infra/data"
+    dynamic "node" {
+      for_each = local.nodes
+      content {
+        role                   = node.value.role
+        kubeadm_config_patches = node.value.patches
+
+        dynamic "extra_mounts" {
+          for_each = node.value.role == "control-plane" && var.enable_data_mount ? [1] : []
+          content {
+            host_path      = var.data_host_path
+            container_path = "/mnt/am-infra/data"
+          }
+        }
+
+        dynamic "extra_mounts" {
+          for_each = node.value.role == "control-plane" && var.enable_etcd_ram_mount ? [1] : []
+          content {
+            host_path      = var.etcd_ram_host_path
+            container_path = "/var/lib/etcd"
+          }
+        }
       }
-      extra_mounts {
-        host_path      = "/mnt/etcd-ram"
-        container_path = "/var/lib/etcd"
-      }
-    }
-
-    # Node 2: Microservices and applications
-    node {
-      role = "worker"
-      kubeadm_config_patches = [
-        <<-EOT
-        kind: JoinConfiguration
-        nodeRegistration:
-          kubeletExtraArgs:
-            node-labels: "role=services"
-        EOT
-      ]
-    }
-
-    # Node 3: Observability stack (Prometheus, Grafana, Loki)
-    node {
-      role = "worker"
-      kubeadm_config_patches = [
-        <<-EOT
-        kind: JoinConfiguration
-        nodeRegistration:
-          kubeletExtraArgs:
-            node-labels: "role=observability"
-        EOT
-      ]
     }
   }
 }

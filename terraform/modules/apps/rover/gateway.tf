@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 
 locals {
-  domain_suffix = var.environment == "local" ? "-local" : ""
+  domain_suffix = var.environment == "prod" ? "" : "-${var.environment}"
 }
 
 resource "kubectl_manifest" "rover_ingress" {

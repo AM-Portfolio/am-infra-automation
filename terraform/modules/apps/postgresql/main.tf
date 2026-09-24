@@ -9,7 +9,7 @@ resource "kubernetes_persistent_volume" "postgres_pv" {
   }
   spec {
     capacity = {
-      storage = "2Gi"
+      storage = var.storage
     }
     volume_mode                      = "Filesystem"
     access_modes                     = ["ReadWriteOnce"]
@@ -21,6 +21,9 @@ resource "kubernetes_persistent_volume" "postgres_pv" {
         type = "DirectoryOrCreate"
       }
     }
+  }
+  lifecycle {
+    ignore_changes = [spec[0].capacity]
   }
 }
 
@@ -34,10 +37,13 @@ resource "kubernetes_persistent_volume_claim" "postgres_pvc" {
     storage_class_name = "manual-hostpath"
     resources {
       requests = {
-        storage = "2Gi"
+        storage = var.storage
       }
     }
     volume_name = kubernetes_persistent_volume.postgres_pv.metadata[0].name
+  }
+  lifecycle {
+    ignore_changes = [spec[0].resources]
   }
 }
 
@@ -89,8 +95,8 @@ resource "kubernetes_stateful_set" "postgresql" {
             sub_path   = "pgdata"
           }
           resources {
-            requests = { memory = "128Mi", cpu = "50m" }
-            limits   = { memory = "512Mi", cpu = "500m" }
+            requests = { memory = var.memory_request, cpu = var.cpu_request }
+            limits   = { memory = var.memory_limit, cpu = var.cpu_limit }
           }
         }
         volume {
@@ -130,28 +136,29 @@ resource "kubernetes_service" "postgresql" {
 # OIDC Configuration Fetch (from Vault)
 # ------------------------------------------------------------------------------
 data "vault_kv_secret_v2" "oidc" {
+  count = var.oidc_enabled ? 1 : 0
   mount = "secret"
   name  = "${var.environment}/infra/oidc-data-stores"
 }
 
 locals {
-  oidc_data = data.vault_kv_secret_v2.oidc.data
+  oidc_data      = var.oidc_enabled ? data.vault_kv_secret_v2.oidc[0].data : {}
   authentik_host = "authentik${var.environment == "prod" ? "" : "-${var.environment}"}.${var.root_domain}"
 
   # pgAdmin OIDC Environment (Extracted for Checksum)
   # IMPORTANT: Values are wrapped in double quotes for Python config_distro.py compatibility
-  pgadmin_oidc_env = {
+  pgadmin_oidc_env = var.oidc_enabled ? {
     PGADMIN_CONFIG_AUTHENTICATION_SOURCES = "['oauth2', 'internal']"
     PGADMIN_CONFIG_OAUTH2_NAME             = "'authentik'"
     PGADMIN_CONFIG_OAUTH2_DISPLAY_NAME     = "'Authentik SSO'"
-    PGADMIN_CONFIG_OAUTH2_CLIENT_ID        = "'${local.oidc_data["pgadmin_client_id"]}'"
-    PGADMIN_CONFIG_OAUTH2_CLIENT_SECRET    = "'${local.oidc_data["pgadmin_client_secret"]}'"
+    PGADMIN_CONFIG_OAUTH2_CLIENT_ID        = "'${lookup(local.oidc_data, "pgadmin_client_id", "")}'"
+    PGADMIN_CONFIG_OAUTH2_CLIENT_SECRET    = "'${lookup(local.oidc_data, "pgadmin_client_secret", "")}'"
     PGADMIN_CONFIG_OAUTH2_SERVER_METADATA_URL = "'https://${local.authentik_host}/application/o/pgadmin/.well-known/openid-configuration'"
     PGADMIN_CONFIG_OAUTH2_SCOPE            = "'openid email profile'"
     PGADMIN_CONFIG_OAUTH2_AUTO_CREATE_USER = "True"
     PGADMIN_CONFIG_OAUTH2_AUTO_LOGIN       = "True"
     PGADMIN_CONFIG_MASTER_PASSWORD         = "False"
-  }
+  } : {}
 }
 
 # pgAdmin UI Installation

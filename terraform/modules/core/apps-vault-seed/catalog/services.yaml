@@ -1,0 +1,480 @@
+# Vault path leaf names under apps/data/<env>/services/<name>
+# Keys = Vault key names (RHS of helm/vault-mappings.yaml). null/empty → fleet placeholder.
+# Mirror of am-gitops/<env>/apps (+ side paths: scheduler, logging, am-auth, am-agents, am-oms).
+# Keep in sync when adding an Argo Application — do not read am-gitops at apply time.
+
+services:
+  am-identity:
+    keys:
+      KEYCLOAK_ADMIN_USER: "admin"
+      KEYCLOAK_ADMIN_PASSWORD: null
+      GOOGLE_CLIENT_ID: null
+      GOOGLE_CLIENT_SECRET: null
+      AM_IDENTITY_CLIENT_ID: "am-identity"
+      AM_IDENTITY_CLIENT_SECRET: null
+      AUTH_EMAIL_TOKEN_SECRET: null
+      AUTH_EMAIL_TOKEN_TTL_SECONDS: "86400"
+      SMTP_HOST: "localhost"
+      SMTP_PORT: "587"
+      SMTP_USER: null
+      SMTP_PASSWORD: null
+      SMTP_FROM: "noreply@asrax.in"
+      SMTP_FROM_DISPLAY_NAME: "AM"
+      SMTP_SSL: "false"
+      SMTP_STARTTLS: "true"
+      PURGE_ENABLED: "false"
+      PURGE_PERIOD_DAYS: "30"
+      PURGE_PERIOD_MINUTES: "0"
+      # QA / agents MCP client_credentials (am-mcp-service)
+      AM_MCP_CLIENT_ID: "am-mcp-service"
+      AM_MCP_CLIENT_SECRET: null
+
+  am-gateway:
+    keys:
+      AM_GATEWAY_STREAMING_CLIENT_ID: "am-gateway"
+      AM_GATEWAY_STREAMING_CLIENT_SECRET: null
+
+  am-api-gateway:
+    keys:
+      INTERNAL_GATEWAY_SECRET: null
+      ALLOWED_ORIGINS: "*"
+
+  am-asrax-proxy:
+    keys:
+      INTERNAL_GATEWAY_SECRET: null
+      ALLOWED_ORIGINS: "*"
+
+  am-ai-gateway:
+    keys:
+      LITELLM_MASTER_KEY: null
+
+  am-modern-ui:
+    keys: {}
+
+  am-market-data:
+    keys:
+      # Consumed by am-gateway vault-mappings (MARKET_DATA_URL <- URL)
+      URL: "__UI_BASE__/market"
+      # OMS / trade CSI maps AM_MARKET_BASE_URL <- url (case-sensitive)
+      url: "__UI_BASE__/market"
+      AM_MARKET_CLIENT_ID: "am-market-data"
+      AM_MARKET_CLIENT_SECRET: null
+      UPSTOX_API_KEY: null
+      UPSTOX_SECRET_KEY: null
+      UPSTOX_REDIRECT_URI: "__UI_BASE__/market/callback"
+      UPSTOCK_ACCESS_TOKEN: null
+      api_host: "https://cdn.growthbook.io"
+      client_key: null
+      redis_cache_ttl_analysis: "300"
+      redis_cache_ttl_historical: "3600"
+      redis_cache_ttl_intraday_buffer: "60"
+      redis_cache_ttl_intraday_future: "60"
+      redis_cache_ttl_intraday_past: "60"
+      redis_cleanup_batch_size: "1000"
+      redis_cleanup_retention_days: "7"
+      scheduler_timezone: "Asia/Kolkata"
+      scheduler_cookie_enabled: "false"
+      scheduler_cookie_refresh_cron: "0 */6 * * *"
+      scheduler_stock_indices_enabled: "false"
+      scheduler_stock_indices_morning_fetch_cron: "0 9 * * 1-5"
+      scheduler_stock_indices_evening_fetch_cron: "0 16 * * 1-5"
+      scheduler_stock_indices_retry_cron: "*/15 * * * *"
+      scheduler_stock_indices_retry_interval_minutes: "15"
+      scheduler_stock_indices_retry_max_retries: "3"
+      scheduler_indices_fetch_cron: "0 9 * * 1-5"
+      scheduler_ingestion_enabled: "false"
+      scheduler_ingestion_provider: "upstox"
+      scheduler_ingestion_force: "false"
+      scheduler_ingestion_use_websocket: "false"
+      scheduler_ingestion_poll_enabled: "false"
+      scheduler_ingestion_poll_historical: "false"
+      scheduler_ingestion_start_cron: "0 9 * * 1-5"
+      scheduler_ingestion_stop_cron: "0 16 * * 1-5"
+      scheduler_ingestion_symbols: "RELIANCE"
+      scheduler_historical_sync_cron: "0 2 * * *"
+      scheduler_analysis_daily_cron: "0 18 * * 1-5"
+      scheduler_redis_cleanup_cron: "0 3 * * *"
+      scheduler_redis_cleanup_enabled: "false"
+      scheduler_stream_start_cron: "0 9 * * 1-5"
+      scheduler_stream_stop_cron: "0 16 * * 1-5"
+      scheduler_market_start: "09:15"
+      scheduler_market_end: "15:30"
+
+  am-market-data-scheduler:
+    # Same scheduler keys as am-market-data — market-data SPC mounts this path.
+    keys:
+      redis_cache_ttl_analysis: "300"
+      redis_cache_ttl_historical: "3600"
+      redis_cache_ttl_intraday_buffer: "60"
+      redis_cache_ttl_intraday_future: "60"
+      redis_cache_ttl_intraday_past: "60"
+      redis_cleanup_batch_size: "1000"
+      redis_cleanup_retention_days: "7"
+      scheduler_timezone: "Asia/Kolkata"
+      scheduler_cookie_enabled: "false"
+      scheduler_cookie_refresh_cron: "0 */6 * * *"
+      scheduler_stock_indices_enabled: "false"
+      scheduler_stock_indices_morning_fetch_cron: "0 9 * * 1-5"
+      scheduler_stock_indices_evening_fetch_cron: "0 16 * * 1-5"
+      scheduler_stock_indices_retry_cron: "*/15 * * * *"
+      scheduler_stock_indices_retry_interval_minutes: "15"
+      scheduler_stock_indices_retry_max_retries: "3"
+      scheduler_indices_fetch_cron: "0 9 * * 1-5"
+      scheduler_ingestion_enabled: "false"
+      scheduler_ingestion_provider: "upstox"
+      scheduler_ingestion_force: "false"
+      scheduler_ingestion_use_websocket: "false"
+      scheduler_ingestion_poll_enabled: "false"
+      scheduler_ingestion_poll_historical: "false"
+      scheduler_ingestion_start_cron: "0 9 * * 1-5"
+      scheduler_ingestion_stop_cron: "0 16 * * 1-5"
+      scheduler_ingestion_symbols: "RELIANCE"
+      scheduler_historical_sync_cron: "0 2 * * *"
+      scheduler_analysis_daily_cron: "0 18 * * 1-5"
+      scheduler_redis_cleanup_cron: "0 3 * * *"
+      scheduler_redis_cleanup_enabled: "false"
+      scheduler_stream_start_cron: "0 9 * * 1-5"
+      scheduler_stream_stop_cron: "0 16 * * 1-5"
+      scheduler_market_start: "09:15"
+      scheduler_market_end: "15:30"
+
+  am-portfolio:
+    keys:
+      AM_PORTFOLIO_CLIENT_ID: "am-portfolio"
+      AM_PORTFOLIO_CLIENT_SECRET: null
+      DEMO_PORTFOLIO_ID: "00000000-0000-0000-0000-000000000001"
+
+  am-trade-management:
+    keys:
+      AM_TRADE_CLIENT_ID: "am-trade-management"
+      AM_TRADE_CLIENT_SECRET: null
+      DEMO_PORTFOLIO_ID: "00000000-0000-0000-0000-000000000001"
+      AM_TRADE_JOURNAL_BASE_URL: "__UI_BASE__/trade"
+
+  am-oms:
+    keys:
+      AM_OMS_MONGO_DATABASE: "am_oms"
+      AM_OMS_DB_USER: "am_oms_user"
+      AM_OMS_DB_PASSWORD: null
+      AM_TRADE_JOURNAL_BASE_URL: "__UI_BASE__/trade"
+      # kafka via exposer :9092
+      KAFKA_ENABLED: "false"
+      KAFKA_SASL_MECHANISM: "PLAIN"
+      KAFKA_SECURITY_PROTOCOL: "PLAINTEXT"
+
+  am-news:
+    keys:
+      MONGO_DB: "am_news"
+      MARKET_DATA_URL: "__UI_BASE__/market"
+      NEWS_SYNC_ENABLED: "1"
+      NEWS_DOCS_ENABLED: "1"
+
+  am-user-platform:
+    keys:
+      AM_USER_PLATFORM_CLIENT_ID: "am-user-platform"
+      AM_USER_PLATFORM_CLIENT_SECRET: null
+      SERVICE_TOKEN: null
+      AM_USER_PLATFORM_DB_NAME: "user_platform"
+      AM_USER_PLATFORM_DB_USER: "am_user_platform_user"
+      AM_USER_PLATFORM_DB_PASSWORD: null
+
+  am-qa-agents:
+    keys:
+      # Overridden in locals with real postgres URL (same shape as DATABASE_URL)
+      QA_AGENT_DATABASE_URL: null
+      SPT_DATABASE_URL: null
+      SPT_BOOTSTRAP_KEYS: "developer:fleet-dev:spt_sk_fleet_change_me"
+      SPT_ACL_REQUIRED: "false"
+      GITHUB_TOKEN: null
+      QA_AGENT_SKIP_GITHUB_CHECKS: "true"
+
+  am-asrax-corp:
+    keys:
+      AM_ASRAX_CORP_API_KEY: null
+      MONGO_URI: null
+      MONGO_DB: "am_asrax_corp"
+      MINIO_ENDPOINT: "minio-__ENV__.asrax.in:9000"
+      MINIO_ACCESS_KEY: null
+      MINIO_SECRET_KEY: null
+      MINIO_BUCKET: "am-asrax-corp"
+      MINIO_SECURE: "false"
+      PAYSLIP_EMAIL_ENABLED: "false"
+      PAYSLIP_EMAIL_FROM: "hr@asrax.in"
+      SMTP_HOST: "localhost"
+      SMTP_PORT: "587"
+      SMTP_USER: null
+      SMTP_PASSWORD: null
+      SMTP_USE_TLS: "true"
+
+  am-mkt-agents:
+    keys:
+      YOUTUBE_API_KEY: null
+      MONGO_URI: null
+      MONGO_DB: "am_mkt_agents"
+
+  am-resume:
+    keys:
+      RESUME_API_KEY: null
+
+  am-document-processor:
+    keys:
+      AM_DOCUMENT_PROCESSOR_CLIENT_ID: "am-document-processor"
+      AM_DOCUMENT_PROCESSOR_CLIENT_SECRET: null
+      SPRING_DATA_MONGODB_AUTO_INDEX_CREATION: "false"
+
+  am-analysis:
+    keys:
+      AM_ANALYSIS_CLIENT_ID: "am-analysis"
+      AM_ANALYSIS_CLIENT_SECRET: null
+      DEMO_PORTFOLIO_ID: "00000000-0000-0000-0000-000000000001"
+
+  am-subscription:
+    keys:
+      AM_SUBSCRIPTION_CLIENT_ID: "am-subscription"
+      AM_SUBSCRIPTION_CLIENT_SECRET: null
+      AM_LAGO_CLIENT_ID: "am-lago"
+      AM_LAGO_CLIENT_SECRET: null
+      AM_SUBSCRIPTION_DB_NAME: "am_subscription"
+      AM_SUBSCRIPTION_DB_USER: "am_subscription_user"
+      AM_SUBSCRIPTION_DB_PASSWORD: null
+      LAGO_API_URL: "https://lago-__ENV__.asrax.in"
+      LAGO_ORG_API_KEY: null
+      LAGO_WEBHOOK_SECRET: null
+      DEFAULT_PLAN_CODE: "am_free"
+      # Numerics must be real floats — fleet placeholders break pydantic float() at boot
+      TRIAL_GRANT_DELAY_HOURS: "24"
+      REFERRAL_REWARD_DELAY_HOURS: "24"
+      REFERRAL_SHARE_BASE_URL: "__UI_BASE__/referral"
+      # kafka via exposer :9092
+      KAFKA_ENABLED: "false"
+
+  am-notification:
+    keys:
+      AM_NOTIFICATION_CLIENT_ID: "am-notification"
+      AM_NOTIFICATION_CLIENT_SECRET: null
+      AM_NOTIFICATION_MONGO_DATABASE: "am_notification"
+      AM_NOTIFICATION_DB_USER: "am_notification_user"
+      AM_NOTIFICATION_DB_PASSWORD: null
+      # kafka via exposer :9092
+      KAFKA_ENABLED: "false"
+      KAFKA_SASL_MECHANISM: "PLAIN"
+      KAFKA_SECURITY_PROTOCOL: "PLAINTEXT"
+      NOTIFICATION_PROVIDER: "novu"
+      NOVU_API_KEY: null
+      NOVU_API_URL: "https://novu-__ENV__.asrax.in"
+      NOVU_APPLICATION_IDENTIFIER: null
+
+  am-novu:
+    keys:
+      NOVU_API_KEY: null
+      NOVU_API_URL: "https://novu-__ENV__.asrax.in"
+      NOVU_APPLICATION_IDENTIFIER: null
+
+  am-lago:
+    keys:
+      LAGO_API_URL: "https://lago-__ENV__.asrax.in"
+      LAGO_ORG_API_KEY: null
+
+  am-parser:
+    keys:
+      URL: "__UI_BASE__/parser"
+      PARSER_CLIENT_ID: "am-parser"
+      PARSER_CLIENT_SECRET: null
+      TOGETHER_API_KEY: null
+
+  am-mcp-server:
+    keys:
+      AM_MCP_CLIENT_ID: "am-mcp-server"
+      AM_MCP_CLIENT_SECRET: null
+
+  am-cloudinary-manager:
+    keys:
+      AM_CLOUDINARY_CLIENT_ID: "am-cloudinary-manager"
+      AM_CLOUDINARY_CLIENT_SECRET: null
+      CLOUDINARY_CLOUD_NAME: null
+      CLOUDINARY_API_KEY: null
+      CLOUDINARY_API_SECRET: null
+
+  am-email-extractor:
+    keys:
+      AM_DOC_INTELLIGENCE_CLIENT_ID: "am-email-extractor"
+      AM_DOC_INTELLIGENCE_CLIENT_SECRET: null
+      GOOGLE_CLIENT_ID: null
+      GOOGLE_CLIENT_SECRET: null
+      KAFKA_REQUIRED: "false"
+
+  am-logging:
+    keys:
+      LOG_LEVEL: "INFO"
+      LOG_FORMAT: "json"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces"
+
+  logging:
+    keys:
+      LOG_LEVEL: "INFO"
+      LOG_FORMAT: "json"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces"
+
+  am-auth:
+    keys: {}
+
+  am-agents:
+    # Support/tool/db agents mount this path — keep in sync with am-agents-mcp-gateway.
+    keys:
+      AM_MCP_CLIENT_SECRET: null
+      LITELLM_MASTER_KEY: null
+      LITELLM_BASE_URL: "https://litellm-__ENV__.asrax.in"
+      LANGFUSE_PUBLIC_KEY: null
+      LANGFUSE_SECRET_KEY: null
+      LANGFUSE_HOST: "https://langfuse-__ENV__.asrax.in"
+      GROWTHBOOK_API_HOST: "https://cdn.growthbook.io"
+      GROWTHBOOK_CLIENT_KEY: null
+      GROWTHBOOK_ENABLED: "false"
+      GROWTHBOOK_CACHE_TTL_SECONDS: "60"
+      GROWTHBOOK_RETRY_SECONDS: "30"
+      GROWTHBOOK_ROUTE_FEATURE_KEY: "support-agent-route"
+      GRAFANA_EXTERNAL_URL: "https://grafana-__ENV__.asrax.in"
+      GRAFANA_SERVICE_ACCOUNT_TOKEN: null
+      GRAFANA_TEMPO_DATASOURCE_UID: "tempo"
+      OPENPROJECT_URL: "https://openproject-__ENV__.asrax.in"
+      OPENPROJECT_API_TOKEN: null
+      OPENPROJECT_PROJECT_ID: "1"
+      OPENPROJECT_TYPE_ID: "1"
+      OPENPROJECT_DEFAULT_ASSIGNEE_LOGIN: "admin"
+      OPENPROJECT_ADMIN_LOGIN: "admin"
+      OPENPROJECT_ADMIN_PASSWORD: null
+      TEMPORAL_HOST: "temporal-rpc-__ENV__.asrax.in:7233"
+      TEMPORAL_NAMESPACE: "default"
+      TEMPORAL_TASK_QUEUE: "support-agent"
+      TEMPORAL_UI_EXTERNAL_URL: "https://temporal-__ENV__.asrax.in"
+      TOOL_AGENT_BASE_URL: "http://am-tool-agent.am-apps-__ENV__.svc:8080"
+      TOOL_AGENT_ALLOW_WRITES: "false"
+      TOOL_AGENT_SAFE_NAMESPACES: "default"
+      DB_AGENT_BASE_URL: "http://am-db-agent.am-apps-__ENV__.svc:8080"
+      UI_TEST_AGENT_BASE_URL: "http://am-ui-test-agent.am-apps-__ENV__.svc:8080"
+      MINIO_ACCESS_KEY: null
+      MINIO_SECRET_KEY: null
+      MINIO_PUBLIC_URL: "https://minio-__ENV__.asrax.in"
+      ZOHO_CLIQ_WEBHOOK_URL: null
+      ZOHO_CLIQ_LAB_WEBHOOK_URL: null
+      ZOHO_CLIQ_PROD_WEBHOOK_URL: null
+      ZOHO_CLIQ_SUMMARY_WEBHOOK_URL: null
+      SUPPORT_AGENT_LLM_ENABLED: "false"
+      SUPPORT_AGENT_LLM_PROVIDER: "litellm"
+      SUPPORT_AGENT_LLM_MODEL: "gpt-4o-mini"
+      SUPPORT_AGENT_TEMPORAL_ENABLED: "false"
+      SUPPORT_AGENT_TRACING_ENABLED: "false"
+      SUPPORT_AGENT_CANARY_MODE: "off"
+      SUPPORT_AGENT_CANARY_PERCENT: "0"
+      SUPPORT_AGENT_REQUIRE_LIVE_ADAPTERS: "false"
+      SUPPORT_AGENT_EPISODE_STORE: "memory"
+      SUPPORT_AGENT_FEEDBACK_STORE: "memory"
+      SUPPORT_AGENT_RUNSTORE: "memory"
+      SUPPORT_AGENT_WORKFLOW_STORE: "memory"
+      SUPPORT_AGENT_GATEWAY_PORT: "8080"
+      SUPPORT_AGENT_INCIDENT_PARITY: "false"
+      SUPPORT_AGENT_SPT_PARITY: "false"
+      INCIDENT_MAIL_ENABLED: "false"
+      INCIDENT_MAIL_CC: ""
+      INCIDENT_VIEW_MORE_URL_TTL_SECONDS: "3600"
+      LINK_ALLOWED_HOSTS: "asrax.in"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "https://otel-__ENV__.asrax.in:4318/v1/traces"
+      OTEL_SERVICE_NAME: "am-support-agent"
+      OTEL_SERVICE_NAMESPACE: "am-apps-__ENV__"
+      OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
+      OTEL_TRACES_SAMPLER_ARG: "0.1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      ZOHO_CLIENT_ID: null
+      ZOHO_CLIENT_SECRET: null
+      ZOHO_REFRESH_TOKEN: null
+      ZOHO_MAIL_ACCESS_TOKEN: null
+      ZOHO_MAIL_ACCOUNT_ID: null
+      ZOHO_MAIL_FROM: null
+      ZOHO_MAIL_PASSWORD: null
+      ZOHO_MAIL_USER: null
+      ZOHO_CALENDAR_ACCESS_TOKEN: null
+      ZOHO_CALENDAR_UID: null
+      # CSI maps SUPPORT_AGENT_DATABASE_URL <- url
+      url: "__UI_BASE__"
+
+  # Alias path used by am-db-agent / tool-agent SPCs
+  am-agents-mcp-gateway:
+    keys:
+      AM_MCP_CLIENT_SECRET: null
+      LITELLM_MASTER_KEY: null
+      LITELLM_BASE_URL: "https://litellm-__ENV__.asrax.in"
+      LANGFUSE_PUBLIC_KEY: null
+      LANGFUSE_SECRET_KEY: null
+      LANGFUSE_HOST: "https://langfuse-__ENV__.asrax.in"
+      OPENPROJECT_TYPE_ID: "1"
+      OPENPROJECT_DEFAULT_ASSIGNEE_LOGIN: "admin"
+      OPENPROJECT_ADMIN_LOGIN: "admin"
+      OPENPROJECT_ADMIN_PASSWORD: null
+      TEMPORAL_HOST: "temporal-rpc-__ENV__.asrax.in:7233"
+      TEMPORAL_NAMESPACE: "default"
+      TEMPORAL_TASK_QUEUE: "support-agent"
+      TEMPORAL_UI_EXTERNAL_URL: "https://temporal-__ENV__.asrax.in"
+      TOOL_AGENT_BASE_URL: "http://am-tool-agent.am-apps-__ENV__.svc:8080"
+      TOOL_AGENT_ALLOW_WRITES: "false"
+      TOOL_AGENT_SAFE_NAMESPACES: "default"
+      DB_AGENT_BASE_URL: "http://am-db-agent.am-apps-__ENV__.svc:8080"
+      UI_TEST_AGENT_BASE_URL: "http://am-ui-test-agent.am-apps-__ENV__.svc:8080"
+      MINIO_ACCESS_KEY: null
+      MINIO_SECRET_KEY: null
+      MINIO_PUBLIC_URL: "https://minio-__ENV__.asrax.in"
+      ZOHO_CLIQ_WEBHOOK_URL: null
+      ZOHO_CLIQ_LAB_WEBHOOK_URL: null
+      ZOHO_CLIQ_PROD_WEBHOOK_URL: null
+      ZOHO_CLIQ_SUMMARY_WEBHOOK_URL: null
+      SUPPORT_AGENT_LLM_ENABLED: "false"
+      SUPPORT_AGENT_LLM_PROVIDER: "litellm"
+      SUPPORT_AGENT_LLM_MODEL: "gpt-4o-mini"
+      SUPPORT_AGENT_TEMPORAL_ENABLED: "false"
+      SUPPORT_AGENT_TRACING_ENABLED: "false"
+      SUPPORT_AGENT_CANARY_MODE: "off"
+      SUPPORT_AGENT_CANARY_PERCENT: "0"
+      SUPPORT_AGENT_REQUIRE_LIVE_ADAPTERS: "false"
+      SUPPORT_AGENT_EPISODE_STORE: "memory"
+      SUPPORT_AGENT_FEEDBACK_STORE: "memory"
+      SUPPORT_AGENT_RUNSTORE: "memory"
+      SUPPORT_AGENT_WORKFLOW_STORE: "memory"
+      SUPPORT_AGENT_GATEWAY_PORT: "8080"
+      SUPPORT_AGENT_INCIDENT_PARITY: "false"
+      SUPPORT_AGENT_SPT_PARITY: "false"
+      INCIDENT_MAIL_ENABLED: "false"
+      INCIDENT_MAIL_CC: ""
+      INCIDENT_VIEW_MORE_URL_TTL_SECONDS: "3600"
+      LINK_ALLOWED_HOSTS: "asrax.in"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "https://otel-__ENV__.asrax.in:4318/v1/traces"
+      OTEL_SERVICE_NAME: "am-support-agent"
+      OTEL_SERVICE_NAMESPACE: "am-apps-__ENV__"
+      OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
+      OTEL_TRACES_SAMPLER_ARG: "0.1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      ZOHO_CLIENT_ID: null
+      ZOHO_CLIENT_SECRET: null
+      ZOHO_REFRESH_TOKEN: null
+      ZOHO_MAIL_ACCESS_TOKEN: null
+      ZOHO_MAIL_ACCOUNT_ID: null
+      ZOHO_MAIL_FROM: null
+      ZOHO_MAIL_PASSWORD: null
+      ZOHO_MAIL_USER: null
+      ZOHO_CALENDAR_ACCESS_TOKEN: null
+      ZOHO_CALENDAR_UID: null
+
+  am-support-agent:
+    keys:
+      AM_MCP_CLIENT_SECRET: null
+      LITELLM_MASTER_KEY: null
+
+  am-tool-agent:
+    keys:
+      AM_MCP_CLIENT_SECRET: null
+      LITELLM_MASTER_KEY: null
+
+  am-db-agent:
+    keys:
+      AM_MCP_CLIENT_SECRET: null
+      LITELLM_MASTER_KEY: null
+      LANGFUSE_PUBLIC_KEY: null
+      LANGFUSE_SECRET_KEY: null

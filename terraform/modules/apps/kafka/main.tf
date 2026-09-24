@@ -6,7 +6,7 @@
 resource "kubernetes_persistent_volume" "kafka_pv" {
   metadata { name = "kafka-pv-immortal" }
   spec {
-    capacity = { storage = "5Gi" }
+    capacity = { storage = var.storage }
     volume_mode                      = "Filesystem"
     access_modes                     = ["ReadWriteOnce"]
     persistent_volume_reclaim_policy = "Retain"
@@ -18,6 +18,9 @@ resource "kubernetes_persistent_volume" "kafka_pv" {
       }
     }
   }
+  lifecycle {
+    ignore_changes = [spec[0].capacity]
+  }
 }
 
 resource "kubernetes_persistent_volume_claim" "kafka_pvc" {
@@ -28,12 +31,21 @@ resource "kubernetes_persistent_volume_claim" "kafka_pvc" {
   spec {
     access_modes       = ["ReadWriteOnce"]
     storage_class_name = "manual-hostpath"
-    resources { requests = { storage = "5Gi" } }
+    resources { requests = { storage = var.storage } }
     volume_name = kubernetes_persistent_volume.kafka_pv.metadata[0].name
+  }
+  lifecycle {
+    ignore_changes = [spec[0].resources]
   }
 }
 
 # ── Kafka Native Cluster (KRaft Mode) ──────────────────────────────────────
+locals {
+  advertised_host = var.advertised_host != "" ? var.advertised_host : (
+    var.environment == "prod" ? "kafka.${var.root_domain}" : "kafka-${var.environment}.${var.root_domain}"
+  )
+}
+
 resource "kubernetes_service" "kafka" {
   metadata {
     name      = "kafka"
@@ -42,11 +54,28 @@ resource "kubernetes_service" "kafka" {
   spec {
     selector = { app = "kafka" }
     port {
-      name        = "tcp-client"
+      name        = "tcp-internal"
       port        = 9092
       target_port = 9092
     }
     cluster_ip = "None" # Headless Service
+  }
+}
+
+resource "kubernetes_service" "kafka_external" {
+  metadata {
+    name      = "kafka-external"
+    namespace = var.namespace
+  }
+  spec {
+    type     = "NodePort"
+    selector = { app = "kafka" }
+    port {
+      name        = "tcp-external"
+      port        = 29092
+      target_port = 29092
+      node_port   = 30092
+    }
   }
 }
 
@@ -93,15 +122,19 @@ resource "kubernetes_stateful_set" "kafka" {
           }
           env {
             name  = "KAFKA_LISTENERS"
-            value = "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+            value = "INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093"
           }
           env {
             name  = "KAFKA_ADVERTISED_LISTENERS"
-            value = "PLAINTEXT://kafka:9092"
+            value = "INTERNAL://kafka:9092,EXTERNAL://${local.advertised_host}:9092"
           }
           env {
             name  = "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP"
-            value = "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+            value = "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT"
+          }
+          env {
+            name  = "KAFKA_INTER_BROKER_LISTENER_NAME"
+            value = "INTERNAL"
           }
           env {
             name  = "KAFKA_CONTROLLER_QUORUM_VOTERS"
@@ -139,11 +172,16 @@ resource "kubernetes_stateful_set" "kafka" {
           }
           
           port { container_port = 9092 }
+          port { container_port = 29092 }
           port { container_port = 9093 }
           
           volume_mount {
             name       = "data"
             mount_path = "/var/lib/kafka/data"
+          }
+          resources {
+            requests = { memory = var.memory_request, cpu = var.cpu_request }
+            limits   = { memory = var.memory_limit, cpu = var.cpu_limit }
           }
         }
         volume {
@@ -165,22 +203,23 @@ resource "kubernetes_stateful_set" "kafka" {
 # OIDC Configuration Fetch (from Vault)
 # ------------------------------------------------------------------------------
 data "vault_kv_secret_v2" "oidc" {
+  count = var.oidc_enabled ? 1 : 0
   mount = "secret"
   name  = "${var.environment}/infra/oidc-data-stores"
 }
 
 locals {
-  oidc_data = data.vault_kv_secret_v2.oidc.data
+  oidc_data = var.oidc_enabled ? data.vault_kv_secret_v2.oidc[0].data : {}
 
   # Kafka OIDC Configuration (Extracted for Checksum & Reuse)
   kafka_oidc_config = {
     auth = {
-      type = "OAUTH2"
+      type = var.oidc_enabled ? "OAUTH2" : "DISABLED"
       oauth2 = {
         client = {
           authentik = {
-            clientId               = local.oidc_data["kafka_client_id"]
-            clientSecret           = local.oidc_data["kafka_client_secret"]
+            clientId               = lookup(local.oidc_data, "kafka_client_id", "")
+            clientSecret           = lookup(local.oidc_data, "kafka_client_secret", "")
             scope                  = ["openid", "profile", "email"]
             redirectUri            = "https://kafka-local.munish.org/login/oauth2/code/authentik"
             issuerUri              = "http://authentik-server.identity.svc.cluster.local/application/o/authentik/"

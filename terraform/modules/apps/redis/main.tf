@@ -9,7 +9,7 @@ resource "kubernetes_persistent_volume" "redis_pv" {
   }
   spec {
     capacity = {
-      storage = "1Gi"
+      storage = var.storage
     }
     volume_mode                      = "Filesystem"
     access_modes                     = ["ReadWriteOnce"]
@@ -21,6 +21,9 @@ resource "kubernetes_persistent_volume" "redis_pv" {
         type = "DirectoryOrCreate"
       }
     }
+  }
+  lifecycle {
+    ignore_changes = [spec[0].capacity]
   }
 }
 
@@ -34,10 +37,13 @@ resource "kubernetes_persistent_volume_claim" "redis_pvc" {
     storage_class_name = "manual-hostpath"
     resources {
       requests = {
-        storage = "1Gi"
+        storage = var.storage
       }
     }
     volume_name = kubernetes_persistent_volume.redis_pv.metadata[0].name
+  }
+  lifecycle {
+    ignore_changes = [spec[0].resources]
   }
 }
 
@@ -51,7 +57,7 @@ resource "kubernetes_config_map" "redis_config" {
     namespace = var.namespace
   }
   data = {
-    "redis.conf" = "requirepass ${var.redis_password}\nmaxmemory 128mb\nmaxmemory-policy allkeys-lru\n"
+    "redis.conf" = "requirepass ${var.redis_password}\nmaxmemory ${var.redis_maxmemory}\nmaxmemory-policy allkeys-lru\n"
   }
 }
 
@@ -89,8 +95,8 @@ resource "kubernetes_stateful_set" "redis" {
             mount_path = "/etc/redis"
           }
           resources {
-            requests = { memory = "64Mi", cpu = "25m" }
-            limits   = { memory = "256Mi", cpu = "200m" }
+            requests = { memory = var.memory_request, cpu = var.cpu_request }
+            limits   = { memory = var.memory_limit, cpu = var.cpu_limit }
           }
         }
         volume {

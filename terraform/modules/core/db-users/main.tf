@@ -25,9 +25,31 @@ terraform {
 # POSTGRESQL USER MANAGEMENT
 # ==============================================================================
 
+locals {
+  shared_mode   = var.shared_database != ""
+  use_provider  = var.provision_via == "provider"
+  use_job       = var.provision_via == "job"
+  write_vault   = var.enable_vault_secrets
+  write_authentik = var.enable_authentik && var.infra_admins_group_id != ""
+
+  pg_db_name = local.shared_mode ? var.shared_database : ""
+
+  pg_schema_map = {
+    for item in flatten([
+      for user, spec in var.postgresql_app_users : [
+        for schema in(length(try(spec.schemas, [])) > 0 ? spec.schemas : [user]) : {
+          key    = "${user}__${schema}"
+          user   = user
+          schema = schema
+        }
+      ]
+    ]) : item.key => item
+  }
+}
+
 # Create a dedicated DB user per application that needs PostgreSQL access
 resource "postgresql_role" "app_users" {
-  for_each = var.postgresql_app_users
+  for_each = local.use_provider ? var.postgresql_app_users : {}
 
   name     = each.key
   login    = true
@@ -40,7 +62,7 @@ resource "postgresql_role" "app_users" {
 }
 
 resource "postgresql_database" "app_databases" {
-  for_each = var.postgresql_app_users
+  for_each = local.use_provider && !local.shared_mode ? var.postgresql_app_users : {}
 
   name  = each.value.database != "" ? each.value.database : each.key
   owner = postgresql_role.app_users[each.key].name
@@ -50,8 +72,27 @@ resource "postgresql_database" "app_databases" {
   }
 }
 
+resource "postgresql_database" "shared" {
+  count = local.use_provider && local.shared_mode ? 1 : 0
+
+  name  = var.shared_database
+  owner = "postgres"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "postgresql_schema" "app_schemas" {
+  for_each = local.use_provider && local.shared_mode ? local.pg_schema_map : {}
+
+  name     = each.value.schema
+  database = postgresql_database.shared[0].name
+  owner    = postgresql_role.app_users[each.value.user].name
+}
+
 resource "postgresql_grant" "app_user_grants" {
-  for_each = var.postgresql_app_users
+  for_each = local.use_provider && !local.shared_mode ? var.postgresql_app_users : {}
 
   database    = postgresql_database.app_databases[each.key].name
   role        = postgresql_role.app_users[each.key].name
@@ -92,7 +133,7 @@ resource "mongodbatlas_database_user" "app_users" {
 # ==============================================================================
 
 resource "vault_kv_secret_v2" "postgresql_creds" {
-  for_each = var.postgresql_app_users
+  for_each = local.write_vault ? var.postgresql_app_users : {}
 
   mount               = "secret"
   name                = "infra/db-users/postgresql/${each.key}"
@@ -101,10 +142,11 @@ resource "vault_kv_secret_v2" "postgresql_creds" {
   data_json = jsonencode({
     username     = each.key
     password     = each.value.password
-    database     = each.value.database != "" ? each.value.database : each.key
-    host         = "postgresql.infra.svc.cluster.local"
+    database     = local.shared_mode ? var.shared_database : (each.value.database != "" ? each.value.database : each.key)
+    host         = var.db_host
     port         = "5432"
-    database_url = "postgresql+asyncpg://${each.key}:${each.value.password}@postgresql.infra.svc.cluster.local:5432/${each.value.database != "" ? each.value.database : each.key}"
+    schema       = length(try(each.value.schemas, [])) > 0 ? each.value.schemas[0] : each.key
+    database_url = "postgresql+asyncpg://${each.key}:${each.value.password}@${var.db_host}:5432/${local.shared_mode ? var.shared_database : (each.value.database != "" ? each.value.database : each.key)}"
   })
 
   lifecycle {
@@ -113,7 +155,7 @@ resource "vault_kv_secret_v2" "postgresql_creds" {
 }
 
 resource "vault_kv_secret_v2" "mongodb_creds" {
-  for_each = var.mongodb_app_users
+  for_each = local.write_vault ? var.mongodb_app_users : {}
 
   mount               = "secret"
   name                = "infra/db-users/mongodb/${each.key}"
@@ -122,10 +164,10 @@ resource "vault_kv_secret_v2" "mongodb_creds" {
   data_json = jsonencode({
     username     = each.key
     password     = each.value.password
-    database     = each.value.database != "" ? each.value.database : each.key
-    host         = "mongodb.infra.svc.cluster.local"
+    database     = local.shared_mode && each.value.database == "" ? var.shared_database : (each.value.database != "" ? each.value.database : each.key)
+    host         = var.mongo_host
     port         = "27017"
-    mongo_url    = "mongodb://${each.key}:${each.value.password}@mongodb.infra.svc.cluster.local:27017/${each.value.database != "" ? each.value.database : each.key}"
+    mongo_url    = "mongodb://${each.key}:${each.value.password}@${var.mongo_host}:27017/${local.shared_mode && each.value.database == "" ? var.shared_database : (each.value.database != "" ? each.value.database : each.key)}"
   })
 
   lifecycle {
@@ -138,10 +180,10 @@ resource "vault_kv_secret_v2" "mongodb_creds" {
 # ==============================================================================
 
 resource "vault_policy" "app_db_policies" {
-  for_each = merge(
+  for_each = local.write_vault ? merge(
     { for k, v in var.postgresql_app_users : "pg-${k}" => "infra/data/db-users/postgresql/${k}" },
     { for k, v in var.mongodb_app_users    : "mg-${k}" => "infra/data/db-users/mongodb/${k}" }
-  )
+  ) : {}
 
   name = "db-access-${each.key}"
 
@@ -159,7 +201,7 @@ resource "vault_policy" "app_db_policies" {
 # to act as the database admin. Links to the infra-admins group.
 
 resource "authentik_user" "db_admin_users" {
-  for_each = var.db_admin_accounts
+  for_each = local.write_authentik ? var.db_admin_accounts : {}
 
   username = each.key
   name     = each.value.display_name
@@ -194,10 +236,11 @@ resource "kubernetes_secret" "postgresql_app_creds" {
   data = {
     DB_USERNAME     = each.key
     DB_PASSWORD     = each.value.password
-    DB_NAME         = each.value.database != "" ? each.value.database : each.key
-    DB_HOST         = "postgresql.infra.svc.cluster.local"
+    DB_NAME         = local.shared_mode ? var.shared_database : (each.value.database != "" ? each.value.database : each.key)
+    DB_HOST         = var.db_host
     DB_PORT         = "5432"
-    DATABASE_URL    = "postgresql+asyncpg://${each.key}:${each.value.password}@postgresql.infra.svc.cluster.local:5432/${each.value.database != "" ? each.value.database : each.key}"
+    DB_SCHEMA       = length(try(each.value.schemas, [])) > 0 ? each.value.schemas[0] : each.key
+    DATABASE_URL    = "postgresql://${each.key}:${each.value.password}@${var.db_host}:5432/${local.shared_mode ? var.shared_database : (each.value.database != "" ? each.value.database : each.key)}"
   }
 
   lifecycle {
@@ -224,10 +267,10 @@ resource "kubernetes_secret" "mongodb_app_creds" {
   data = {
     DB_USERNAME = each.key
     DB_PASSWORD = each.value.password
-    DB_NAME     = each.value.database != "" ? each.value.database : each.key
-    DB_HOST     = "mongodb.infra.svc.cluster.local"
+    DB_NAME     = local.shared_mode && each.value.database == "" ? var.shared_database : (each.value.database != "" ? each.value.database : each.key)
+    DB_HOST     = var.mongo_host
     DB_PORT     = "27017"
-    MONGO_URL   = "mongodb://${each.key}:${each.value.password}@mongodb.infra.svc.cluster.local:27017/${each.value.database != "" ? each.value.database : each.key}"
+    MONGO_URL   = "mongodb://${each.key}:${each.value.password}@${var.mongo_host}:27017/${local.shared_mode && each.value.database == "" ? var.shared_database : (each.value.database != "" ? each.value.database : each.key)}"
   }
 
   lifecycle {

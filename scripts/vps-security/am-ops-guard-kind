@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# am-ops-guard: refuse kind create|delete for am-ops; passthrough for others.
+set -euo pipefail
+
+REAL="${AM_OPS_REAL_KIND:-/usr/local/libexec/am-real/kind}"
+if [[ ! -x "$REAL" ]]; then
+  for cand in /opt/am-ops-guard/real/kind /usr/bin/kind; do
+    [[ -x "$cand" ]] && REAL="$cand" && break
+  done
+fi
+
+if [[ "$(id -un 2>/dev/null)" == "am-ops" ]]; then
+  sub="${1:-}"
+  case "$sub" in
+    create|delete)
+      echo "am-ops-guard: REFUSED kind $sub — only via /usr/local/sbin/break-glass-kind.sh (G1, root)." >&2
+      exit 1
+      ;;
+  esac
+fi
+
+if [[ ! -x "${REAL:-}" ]]; then
+  echo "am-ops-guard: real kind not found" >&2
+  exit 127
+fi
+exec "$REAL" "$@"
