@@ -1,6 +1,10 @@
 # TODO — kind-fleet-clusters
 
-Pack: `docs/kind-fleet-clusters/`. Resume from the first unchecked **Test** item.
+**Agent playbook:** skill **`am-kind-fleet`** in `amctl/ai-catalog/skills/platform/am-kind-fleet/` (install with `am ai sync` / `am ai install` when ready — review skill first). Checkboxes here remain SoT for multi-env / laptop history.
+
+**Prod track SoT:** [`PROD_DEPLOY.md`](PROD_DEPLOY.md) + [`prod/`](prod/) (VPS1 phase-wise Implement + Test — all unchecked until executed).
+
+Pack: `docs/kind-fleet-clusters/`. Resume from the first unchecked **Test** item (for **prod**, open `prod/` first).
 
 **G26 (once, after DBs exist):** reach everything at `*.asrax.in`. Never `localhost`, `127.0.0.1`, `host.docker.internal`, or a Docker-host / bridge IP in Vault, Helm, Traefik, OIDC, or MCP. Same-host stores: **DNS-only** A record → that host’s private/WG IP (not orange-cloud).
 
@@ -684,8 +688,8 @@ Resume flags: `-SkipBackup -SkipWipe -SkipTerraform -SkipPin` / `-StartFromWave 
 
 **Codified fleet fixes (no manual kubectl/vault after seed):**
 - Vault catalog: `TRIAL_GRANT_DELAY_HOURS` / `REFERRAL_*` numerics, `KAFKA_ENABLED=false` (subscription + notification + oms), full `am-agents` ops keys + `SUPPORT_AGENT_GATEWAY_PORT=8080`, `am-market-data.URL`, **`am-news`**, **`am-user-platform`**, **`am-oms`**, **`am-qa-agents`** (+ `runtime/modules/qa`), **`am-asrax-corp`**, **`am-mkt-agents`**, **`am-resume`**, identity `AM_MCP_*`
-- GitOps `dev/apps`: **`am-oms`**, **`am-news`**, **`am-user-platform`**, **`am-qa-agents`**, **`am-asrax-corp`**, **`am-asrax-ui`**, **`am-mkt-agents`**, **`am-mkt-portal-ui`** (+ image-tags + pin catalog); **`am-resume`** in `apps-full` until GHCR image exists
-- **n8n** is platform terraform (`n8n-dev.asrax.in`), not an am-apps Argo Application
+- GitOps `dev/apps`: **`am-oms`**, **`am-news`**, **`am-user-platform`**, **`am-asrax-corp`**, … (+ image-tags); **`am-asrax-ui`** + agents UIs live under `dev/agents` / `prod/agents`
+- **n8n** Argo Application under `{env}/agents/n8n.yaml` (destination platform NS `n8n`); platform TF still seeds `n8n-secrets` + NodePort/route
 - `setup-g25-vault-auth.ps1`: `ghcr-creds` alias + `am-apps-read` covers `apps/` and legacy `secret/data/dev/*`
 - stores `db_users`: `am_subscription_user`, `am_user_platform_user` + dedicated DB ownership after restore
 - GitOps / helm: support-agent port 8080 + worker replicas 0; email `KAFKA_REQUIRED=false`; pin script never writes `tag:"""`; corp/asrax-ui/mkt-portal `values.dev.yaml`; qa vault paths → `apps/data/dev/...`

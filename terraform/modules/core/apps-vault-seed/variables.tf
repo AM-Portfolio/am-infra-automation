@@ -53,6 +53,19 @@ variable "keycloak_realm" {
   default = "am-realm"
 }
 
+variable "keycloak_admin_user" {
+  type        = string
+  default     = "admin"
+  description = "Keycloak master admin username (must match platform Keycloak)."
+}
+
+variable "keycloak_admin_password" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Keycloak master admin password from platform apply. Required — refuse fleet placeholders."
+}
+
 variable "ui_base_url" {
   type        = string
   default     = ""

@@ -29,9 +29,9 @@ resource "kubernetes_secret" "n8n" {
 
 resource "helm_release" "n8n" {
   name             = "n8n"
-  repository       = "oci://ghcr.io/n8n-io/n8n-helm-chart"
-  chart            = "n8n"
+  chart            = "${path.module}/chart"
   namespace        = var.namespace
+  # Vendored OCI chart (ghcr.io/n8n-io/n8n-helm-chart) — VPS GHCR OCI pulls return 403.
   version          = var.chart_version
   create_namespace = false
   wait             = true

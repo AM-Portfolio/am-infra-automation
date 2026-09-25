@@ -36,7 +36,7 @@ locals {
     # Dedicated DB ownership (restored dumps often leave tables owned by postgres).
     [
       for user, spec in var.postgresql_app_users :
-      "psql -d ${spec.database != "" ? spec.database : user} -c \"ALTER DATABASE ${spec.database != "" ? spec.database : user} OWNER TO ${user}; GRANT ALL ON SCHEMA public TO ${user}; GRANT ALL ON ALL TABLES IN SCHEMA public TO ${user}; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO ${user}; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${user}; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${user}; DO \\$\\$ DECLARE r record; BEGIN FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP EXECUTE format('ALTER TABLE public.%I OWNER TO ${user}', r.tablename); END LOOP; FOR r IN SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public' LOOP EXECUTE format('ALTER SEQUENCE public.%I OWNER TO ${user}', r.sequence_name); END LOOP; END \\$\\$;\""
+      "psql -d ${spec.database != "" ? spec.database : user} -c \"ALTER DATABASE ${spec.database != "" ? spec.database : user} OWNER TO ${user}; GRANT ALL ON SCHEMA public TO ${user}; REASSIGN OWNED BY postgres TO ${user}; GRANT ALL ON ALL TABLES IN SCHEMA public TO ${user}; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO ${user}; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${user}; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${user}; DO \\$\\$ DECLARE r record; BEGIN FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP EXECUTE format('ALTER TABLE public.%I OWNER TO ${user}', r.tablename); END LOOP; FOR r IN SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public' LOOP EXECUTE format('ALTER SEQUENCE public.%I OWNER TO ${user}', r.sequence_name); END LOOP; END \\$\\$;\""
       if spec.database != "" || try(spec.createdb, false)
     ],
     local.shared_mode ? flatten([
@@ -230,7 +230,7 @@ resource "kubernetes_job" "minio_users" {
         node_selector  = { role = "infra" }
         container {
           name  = "mc"
-          image = "quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z"
+          image = "am-local/mc:RELEASE.2025-08-13T08-35-41Z"
           env {
             name = "MINIO_ROOT_USER"
             value_from {

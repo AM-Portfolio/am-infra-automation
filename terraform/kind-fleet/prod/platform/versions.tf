@@ -6,9 +6,35 @@ terraform {
       source  = "tehcyx/kind"
       version = "~> 0.2.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.24"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12"
+    }
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = "~> 1.14"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.2"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+    external = {
+      source  = "hashicorp/external"
+      version = "~> 2.3"
+    }
   }
 
-  # State is on the host, never in git. Default local file is gitignored.
-  # Init on the host with: terraform init -backend-config=backend.hcl
   backend "local" {}
 }

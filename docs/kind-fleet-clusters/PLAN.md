@@ -1,5 +1,7 @@
 # PLAN — kind-fleet-clusters
 
+**Agent playbook:** skill **`am-kind-fleet`** in `amctl/ai-catalog/skills/platform/am-kind-fleet/` (phase refs + touch-once + ZT access window). Checklists stay in [TODO.md](TODO.md). **Prod stand-up checkboxes:** [PROD_DEPLOY.md](PROD_DEPLOY.md) + [prod/](prod/).
+
 | Field | Value |
 |-------|--------|
 | Kind | `feature` |

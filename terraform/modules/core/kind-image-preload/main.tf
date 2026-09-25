@@ -21,7 +21,7 @@ variable "enabled" {
 }
 
 locals {
-  node_name = "${var.cluster_name}-control-plane"
+  node_name  = "${var.cluster_name}-control-plane"
   images_csv = join(",", var.images)
 }
 
@@ -34,26 +34,41 @@ resource "terraform_data" "crictl_pull" {
   }
 
   provisioner "local-exec" {
-    interpreter = ["PowerShell", "-NoProfile", "-Command"]
+    interpreter = ["/bin/bash", "-c"]
     environment = {
       KIND_NODE  = local.node_name
       IMAGES_CSV = local.images_csv
     }
-    command = <<-PS
-      $ErrorActionPreference = 'Stop'
-      $node = $env:KIND_NODE
-      if (-not (docker inspect $node 2>$null)) {
-        throw "KinD node container missing: $node (cluster not running?)"
-      }
-      $imgs = $env:IMAGES_CSV.Split(',') | Where-Object { $_ -and $_.Trim() }
-      foreach ($img in $imgs) {
-        $img = $img.Trim()
-        Write-Output "kind-preload: crictl pull $img on $node"
-        docker exec $node crictl pull $img
-        if ($LASTEXITCODE -ne 0) { throw "crictl pull failed: $img (exit $LASTEXITCODE)" }
-      }
-      Write-Output "kind-preload: ok count=$($imgs.Count) node=$node"
-    PS
+    command = <<-BASH
+      set -euo pipefail
+      node="$${KIND_NODE}"
+      if ! docker inspect "$node" >/dev/null 2>&1; then
+        echo "KinD node container missing: $node (cluster not running?)" >&2
+        exit 1
+      fi
+      IFS=',' read -r -a imgs <<< "$${IMAGES_CSV}"
+      count=0
+      for img in "$${imgs[@]}"; do
+        img=$(echo "$img" | xargs)
+        [ -z "$img" ] && continue
+        echo "kind-preload: crictl pull $img on $node"
+        ok=0
+        for attempt in 1 2 3 4 5; do
+          if docker exec "$node" crictl pull "$img"; then
+            ok=1
+            break
+          fi
+          echo "kind-preload: retry $attempt for $img"
+          sleep $((attempt * 5))
+        done
+        if [ "$ok" != "1" ]; then
+          echo "crictl pull failed after retries: $img" >&2
+          exit 1
+        fi
+        count=$((count + 1))
+      done
+      echo "kind-preload: ok count=$count node=$node"
+    BASH
   }
 }
 

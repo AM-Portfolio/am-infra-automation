@@ -58,22 +58,44 @@ resource "terraform_data" "env_folder_guard" {
   }
 }
 
+resource "terraform_data" "require_kc_admin_env" {
+  input = local.kc_env_file
+  lifecycle {
+    precondition {
+      condition = length(coalesce(
+        try(local.kc["KEYCLOAK_ADMIN_PASSWORD"], ""),
+        try(local.kc["KC_ADMIN_PASSWORD"], ""),
+        try(local.kc["KEYCLOAK_PASSWORD"], "")
+      )) >= 8
+      error_message = "Missing Keycloak admin password in ${local.kc_env_file} (KEYCLOAK_ADMIN_PASSWORD / KC_ADMIN_PASSWORD)."
+    }
+  }
+}
+
 module "seed" {
   source = "../../../modules/core/apps-vault-seed"
 
-  env               = local.env
-  domain            = local.domain
-  postgres_user     = local.stores["POSTGRES_USER"]
-  postgres_password = local.stores["POSTGRES_PASSWORD"]
-  postgres_db       = try(local.stores["POSTGRES_DB"], "postgres")
-  mongo_user        = local.stores["MONGO_USER"]
-  mongo_password    = local.stores["MONGO_PASSWORD"]
-  redis_password    = local.stores["REDIS_PASSWORD"]
-  influx_token      = local.stores["INFLUX_TOKEN"]
-  influx_org        = local.stores["INFLUX_ORG"]
-  influx_bucket     = local.stores["INFLUX_BUCKET"]
-  influx_password   = try(local.stores["INFLUX_PASSWORD"], "")
-  keycloak_realm    = try(local.kc["KEYCLOAK_REALM"], "am-realm")
+  env                     = local.env
+  domain                  = local.domain
+  postgres_user           = local.stores["POSTGRES_USER"]
+  postgres_password       = local.stores["POSTGRES_PASSWORD"]
+  postgres_db             = try(local.stores["POSTGRES_DB"], "postgres")
+  mongo_user              = local.stores["MONGO_USER"]
+  mongo_password          = local.stores["MONGO_PASSWORD"]
+  redis_password          = local.stores["REDIS_PASSWORD"]
+  influx_token            = local.stores["INFLUX_TOKEN"]
+  influx_org              = local.stores["INFLUX_ORG"]
+  influx_bucket           = local.stores["INFLUX_BUCKET"]
+  influx_password         = try(local.stores["INFLUX_PASSWORD"], "")
+  keycloak_realm          = try(local.kc["KEYCLOAK_REALM"], "am-realm")
+  keycloak_admin_user     = try(local.kc["KEYCLOAK_ADMIN_USER"], try(local.kc["KC_ADMIN_USER"], "admin"))
+  keycloak_admin_password = coalesce(
+    try(local.kc["KEYCLOAK_ADMIN_PASSWORD"], ""),
+    try(local.kc["KC_ADMIN_PASSWORD"], ""),
+    try(local.kc["KEYCLOAK_PASSWORD"], "")
+  )
+
+  depends_on = [terraform_data.require_kc_admin_env]
 }
 
 output "infra_paths" {

@@ -78,6 +78,8 @@ Module fails plan if obs Access is on without Alloy wiring.
 | Unregistered IP → postgres TCP | refused |
 | Alloy → Loki/Prom after Access | push OK (Service Token) |
 
+HTTP-testable ZT-V cases live in Postman collection **AM Zero-Trust** (workspace Asrax), run against shared env **AM - Dev**. Keep `zt_enforce_expected=false` while `access_enforce` / `mfa_enforce` are off (ZT-P0 must pass); set `zt_enforce_expected=true` after ZT-P1 to assert deny/challenge and Service Token allow. Not covered in Postman: CF browser interstitial UX, TCP data-plane IP refuse, Alloy DaemonSet push.
+
 ## Modules
 
 - [`terraform/modules/core/zero-trust-access`](../terraform/modules/core/zero-trust-access)

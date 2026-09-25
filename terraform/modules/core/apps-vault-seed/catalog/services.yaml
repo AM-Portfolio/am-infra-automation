@@ -478,3 +478,12 @@ services:
       LITELLM_MASTER_KEY: null
       LANGFUSE_PUBLIC_KEY: null
       LANGFUSE_SECRET_KEY: null
+
+  am-fin-agent:
+    # Optional LLM keys — leave null until set; gitops may __jaas__ skip until seeded.
+    keys:
+      AM_FIN_AGENT_CLIENT_SECRET: null
+      LLM_PLAN_A_API_KEY: null
+      TOGETHER_API_KEY: null
+      LITELLM_MASTER_KEY: null
+      AM_MCP_CLIENT_SECRET: null

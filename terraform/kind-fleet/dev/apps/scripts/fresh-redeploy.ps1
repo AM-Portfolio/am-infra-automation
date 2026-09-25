@@ -5,9 +5,10 @@
   Phase A — Vault (Terraform only):
     vault-apps seed (apps-vault-seed) + G25 CSI auth via terraform apply.
 
-  Phase B — Workloads (Argo from main by default):
-    Apply Application YAMLs, then wave-sync W1→W4 so each service pulls
-    targetRevision: main (chart + values + image tags) from git.
+  Phase B — Workloads (Argo from am-gitops repo checkout only):
+    kubectl apply Application YAMLs from {env}/apps + {env}/agents, then
+    Argo sync W1→W4 (targetRevision: main). No /tmp Application JSON,
+    no _gitops-*.tgz, no scripts/kind-fleet/_fix_* surgery.
 
   Also: optional Vault backup/wipe, NS wipe, GHCR pin, domain smoke.
 
@@ -69,14 +70,15 @@ $Wave2 = @(
   "am-document-processor", "am-modern-ui", "am-user-platform"
 )
 $Wave3 = @(
-  "am-asrax-corp", "am-asrax-ui",
+  "am-asrax-corp",
   "am-subscription", "am-notification", "am-logging",
   "am-email-extractor", "am-cloudinary-manager"
 )
 $Wave4 = @(
   "am-support-agent", "am-tool-agent", "am-db-agent",
   "am-qa-agents", "am-mkt-agents", "am-mkt-portal-ui",
-  "am-mcp-server", "am-ai-gateway", "am-fin-agent"
+  "am-mcp-server", "am-ai-gateway", "am-fin-agent",
+  "am-asrax-ui", "n8n"
 )
 
 function Get-VaultToken {

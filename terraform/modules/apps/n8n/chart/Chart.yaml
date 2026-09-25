@@ -1,0 +1,26 @@
+annotations:
+  artifacthub.io/license: MIT
+apiVersion: v2
+appVersion: stable
+description: Production-grade Helm chart for n8n, the workflow automation platform.
+  Supports queue mode, multi-main HA, webhook processors, task runners, HPA, PDB,
+  network policies, and S3 external storage.
+home: https://n8n.io
+icon: https://raw.githubusercontent.com/n8n-io/n8n/master/packages/editor-ui/public/images/n8n-logo.png
+keywords:
+- n8n
+- workflow-automation
+- automation
+- queue
+- redis
+- postgres
+kubeVersion: '>=1.25.0-0'
+maintainers:
+- name: n8n
+  url: https://github.com/n8n-io
+name: n8n
+sources:
+- https://github.com/n8n-io/n8n-hosting
+- https://github.com/n8n-io/n8n
+type: application
+version: 1.11.0

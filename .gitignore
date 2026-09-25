@@ -123,3 +123,14 @@ terraform/kind-fleet/access-allowlist/generated-allowlist.ps1
 # Kind-fleet local artifacts (never commit)
 terraform/kind-fleet/**/tfplan*
 terraform/kind-fleet/**/am-*-config
+
+# Disposable local debug probes (use scripts/kind-fleet/phase_gates instead)
+tmp-*.sh
+.tmp-*
+.tmp-*.sh
+.tmp-*.py
+
+# Kind-fleet / chart cache — never commit Application tarballs or OCI chart caches
+scripts/kind-fleet/**/_gitops-*.tgz
+scripts/kind-fleet/_retired/_gitops-*.tgz
+terraform/modules/apps/_charts/*.tgz

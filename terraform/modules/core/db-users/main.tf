@@ -222,10 +222,11 @@ resource "kubernetes_secret" "postgresql_app_creds" {
   for_each = var.postgresql_app_users
 
   metadata {
-    name      = "db-creds-postgresql-${each.key}"
+    # K8s names cannot contain underscores (RFC 1123).
+    name      = "db-creds-postgresql-${replace(each.key, "_", "-")}"
     namespace = var.namespace
     labels = {
-      app        = each.key
+      app        = replace(each.key, "_", "-")
       db-type    = "postgresql"
       managed-by = "terraform"
     }
@@ -253,10 +254,10 @@ resource "kubernetes_secret" "mongodb_app_creds" {
   for_each = var.mongodb_app_users
 
   metadata {
-    name      = "db-creds-mongodb-${each.key}"
+    name      = "db-creds-mongodb-${replace(each.key, "_", "-")}"
     namespace = var.namespace
     labels = {
-      app        = each.key
+      app        = replace(each.key, "_", "-")
       db-type    = "mongodb"
       managed-by = "terraform"
     }

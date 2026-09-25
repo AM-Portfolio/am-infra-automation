@@ -84,6 +84,9 @@ module "edge" {
     "litellm",
     "langfuse",
     "novu",
+    "am",
+    "corp",
+    "asrax",
   ]
   bare_https_names = []
 }

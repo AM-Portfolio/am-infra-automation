@@ -22,7 +22,7 @@ resource "kind_cluster" "this" {
     }
     precondition {
       condition     = local.node_shape_ok
-      error_message = "prod must be node_shape=two. dev, dr, and obs must be node_shape=one."
+      error_message = "Serve-first: prod infra = node_shape=two; prod apps/platform = one; dev/dr/obs = one."
     }
     precondition {
       condition     = local.api_port_ok
