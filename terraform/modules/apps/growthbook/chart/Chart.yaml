@@ -1,0 +1,30 @@
+annotations:
+  artifacthub.io/images: |-
+    - name: growthbook
+      image: growthbook/growthbook:4.4.0
+      platforms:
+        - linux/amd64
+        - linux/arm64
+apiVersion: v2
+appVersion: 4.4.0
+dependencies:
+- condition: mongodb.enabled
+  name: mongodb
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: ^18.0.0
+- alias: frontend
+  name: server
+  repository: ""
+  version: 0.0.0
+- alias: backend
+  name: server
+  repository: ""
+  version: 0.0.0
+description: Open Source Feature Flags, Experimentation, and Product Analytics
+home: https://www.growthbook.io/
+icon: https://avatars.githubusercontent.com/u/65404594
+name: growthbook
+sources:
+- https://github.com/growthbook/growthbook/
+type: application
+version: 4.4.0

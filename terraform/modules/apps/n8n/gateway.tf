@@ -1,5 +1,9 @@
 # Fleet: Traefik on infra — leave gateway_same_cluster=false; use modules/core/cross-cluster-http.
 
+module "contracts" {
+  source = "../../core/kind-fleet-contracts"
+}
+
 resource "kubernetes_service_v1" "nodeport" {
   count      = var.enable_gateway ? 1 : 0
   depends_on = [helm_release.n8n]
@@ -9,11 +13,8 @@ resource "kubernetes_service_v1" "nodeport" {
     labels    = { app = "n8n" }
   }
   spec {
-    type = "NodePort"
-    selector = {
-      "app.kubernetes.io/name"     = "n8n"
-      "app.kubernetes.io/instance" = "n8n"
-    }
+    type     = "NodePort"
+    selector = module.contracts.n8n_nodeport_selector
     port {
       name        = "http"
       port        = 5678
@@ -46,3 +47,4 @@ resource "kubectl_manifest" "ingressroute" {
 }
 
 output "node_port" { value = var.node_port }
+output "nodeport_selector" { value = module.contracts.n8n_nodeport_selector }

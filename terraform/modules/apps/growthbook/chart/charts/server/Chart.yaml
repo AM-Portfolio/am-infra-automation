@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: 3.5.0
+icon: https://avatars.githubusercontent.com/u/65404594
+name: server
+type: application
+version: 0.0.0

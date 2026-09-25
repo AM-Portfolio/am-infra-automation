@@ -27,9 +27,9 @@ variable "enable_gateway" {
 }
 
 variable "image" {
-  description = "MinIO server image. Docker Hub minio/minio:latest is gone; use Quay."
+  description = "MinIO server image. Quay/Docker Hub community pulls are gone; use host-built am-local/minio (see docs/kind-fleet-clusters)."
   type        = string
-  default     = "quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z"
+  default     = "am-local/minio:RELEASE.2025-09-07T16-13-09Z"
 }
 
 variable "minio_root_user" {

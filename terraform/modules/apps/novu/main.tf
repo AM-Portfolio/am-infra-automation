@@ -70,15 +70,18 @@ resource "helm_release" "novu" {
       replicaCount = 1
       port         = 3000
       # Chart templates dereference .livenessProbe.*; nil map fails helm render.
+      # API is slow to bind on cold start; probes must wait past Nest bootstrap.
       livenessProbe = {
-        initialDelaySeconds = 30
-        periodSeconds       = 10
+        initialDelaySeconds = 180
+        periodSeconds       = 15
         timeoutSeconds      = 5
-        failureThreshold    = 3
+        failureThreshold    = 6
       }
       readinessProbe = {
-        initialDelaySeconds = 5
+        initialDelaySeconds = 60
         periodSeconds       = 10
+        timeoutSeconds      = 5
+        failureThreshold    = 6
       }
       resources = {
         requests = { cpu = var.api_cpu_request, memory = var.api_memory_request }

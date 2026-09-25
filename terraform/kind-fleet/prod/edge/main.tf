@@ -85,8 +85,14 @@ module "edge" {
     "litellm",
     "langfuse",
     "novu",
+    # Product UIs on apps Traefik (via apps-traefik-bridge on infra)
+    "am",
+    "corp",
+    "asrax",
   ]
   bare_https_names = []
+  # Apex company profile (same asrax-ui as asrax.asrax.in)
+  extra_fqdns = ["asrax.in"]
 }
 
 output "traefik_origin" { value = module.edge.traefik_origin }

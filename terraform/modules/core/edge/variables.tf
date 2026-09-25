@@ -54,6 +54,12 @@ variable "bare_https_names" {
   default     = ["grafana", "loki", "prometheus"]
 }
 
+variable "extra_fqdns" {
+  description = "Full FQDNs to add to tunnel ingress + DNS (e.g. apex asrax.in). Not derived from https_names labels."
+  type        = list(string)
+  default     = []
+}
+
 variable "traefik_chart_version" {
   type    = string
   default = "27.0.2"

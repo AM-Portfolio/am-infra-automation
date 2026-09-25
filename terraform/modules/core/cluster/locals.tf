@@ -1,5 +1,13 @@
 locals {
+  # Names (locked): business env always three Kind names am-<env>-{infra,apps,platform}.
+  # obs is a single cluster am-obs on the ops host.
   cluster_name = var.cluster_role == "obs" ? "am-obs" : "am-${var.env}-${var.cluster_role}"
+
+  fleet_kind_names = var.env == "obs" ? ["am-obs"] : [
+    "am-${var.env}-infra",
+    "am-${var.env}-apps",
+    "am-${var.env}-platform",
+  ]
 
   role_label = var.cluster_role == "obs" ? "observability" : var.cluster_role
 
@@ -8,6 +16,7 @@ locals {
   )
   api_server_port = var.api_server_port != null ? var.api_server_port : local.default_api_port
 
+  # Default for env=prod is two — only use for infra. Apps/platform stacks MUST pass node_shape="one".
   default_node_shape = var.env == "prod" ? "two" : "one"
   node_shape         = var.node_shape != null ? var.node_shape : local.default_node_shape
 
@@ -17,9 +26,11 @@ locals {
     (var.env != "obs" && var.cluster_role != "obs")
   )
 
-  # prod is two-node; other business tokens are one-node.
+  # Serve-first (64 GB): prod stacks that omit node_shape must be two (infra).
+  # Apps/platform pass node_shape=one explicitly. Compact/shrink unlock is later.
   node_shape_ok = (
     (var.env == "prod" && local.node_shape == "two") ||
+    (var.env == "prod" && local.node_shape == "one" && contains(["apps", "platform"], var.cluster_role)) ||
     (var.env != "prod" && local.node_shape == "one")
   )
 
@@ -93,7 +104,7 @@ check "env_role_pairing" {
 check "node_shape_for_env" {
   assert {
     condition     = local.node_shape_ok
-    error_message = "prod must be node_shape=two. dev, dr, and obs must be node_shape=one."
+    error_message = "Serve-first: prod infra = node_shape=two; prod apps/platform = one; dev/dr/obs = one. Pass node_shape explicitly on apps/platform."
   }
 }
 
@@ -101,5 +112,17 @@ check "api_port_for_role" {
   assert {
     condition     = local.api_port_ok
     error_message = "infra/obs API must be 6443, apps 6444, platform 6445."
+  }
+}
+
+check "fleet_trio_names" {
+  assert {
+    condition = var.env == "obs" || (
+      length(local.fleet_kind_names) == 3 &&
+      local.fleet_kind_names[0] == "am-${var.env}-infra" &&
+      local.fleet_kind_names[1] == "am-${var.env}-apps" &&
+      local.fleet_kind_names[2] == "am-${var.env}-platform"
+    )
+    error_message = "Business env must expose three Kind names: am-<env>-infra, am-<env>-apps, am-<env>-platform."
   }
 }

@@ -1,25 +1,19 @@
 # Slim Phase 2 edge: Helm Traefik + cloudflared. No Authentik / preprod routes.
 # Tunnel origin is Traefik only. Host rules live on IngressRoutes.
 
+module "contracts" {
+  source           = "../kind-fleet-contracts"
+  environment      = var.environment
+  root_domain      = var.root_domain
+  https_names      = var.https_names
+  bare_https_names = var.bare_https_names
+  extra_fqdns      = var.extra_fqdns
+}
+
 locals {
-  host_suffix = var.environment == "prod" ? "" : "-${var.environment}"
-  # bare_https_names skip env suffix (shared obs hub: grafana/loki/prometheus/tempo.asrax.in)
-  https_fqdn = {
-    for n in var.https_names :
-    n => (
-      var.environment == "prod" || contains(var.bare_https_names, n)
-      ? "${n}.${var.root_domain}"
-      : "${n}-${var.environment}.${var.root_domain}"
-    )
-  }
-  record_name = {
-    for n in var.https_names :
-    n => (
-      var.environment == "prod" || contains(var.bare_https_names, n)
-      ? n
-      : "${n}-${var.environment}"
-    )
-  }
+  host_suffix    = var.environment == "prod" ? "" : "-${var.environment}"
+  https_fqdn     = module.contracts.https_fqdn
+  record_name    = module.contracts.record_name
   traefik_origin = "http://traefik.${var.namespace}.svc.cluster.local:80"
   tunnel_cname   = "${var.tunnel_id}.cfargotunnel.com"
 }

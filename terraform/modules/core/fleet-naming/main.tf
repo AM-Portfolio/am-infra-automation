@@ -19,8 +19,12 @@ locals {
   vault_policy     = "am-apps-read"
   vault_data_prefix = "apps/data/${local.env}"
 
-  middleware_cors  = "${local.env}-global-cors"
-  middleware_strip = "${local.env}-strip-prefix"
+  # Helm values.*.yaml Ingress annotations must match these CR names:
+  #   {appsNs}-{middleware}@kubernetescrd
+  # Contabo/prod (+ preprod) historically use unprefixed CR names; Kind-fleet
+  # laptop envs use "{env}-…" (see am-market-data helm values.dev vs values.prod).
+  middleware_cors  = contains(["prod", "preprod"], local.env) ? "global-cors" : "${local.env}-global-cors"
+  middleware_strip = contains(["prod", "preprod"], local.env) ? "strip-prefix-apps" : "${local.env}-strip-prefix"
 
   apps_cluster_name = "am-${local.env}-apps"
   kubeconfig_apps   = "~/.asrax/kubeconfig.am-${local.env}-apps.yaml"

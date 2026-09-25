@@ -23,6 +23,11 @@ output "node_shape" {
   description = "one or two nodes."
 }
 
+output "fleet_kind_names" {
+  value       = local.fleet_kind_names
+  description = "Always three for business envs: am-<env>-{infra,apps,platform}. obs → [am-obs]."
+}
+
 output "endpoint" {
   value       = kind_cluster.this.endpoint
   description = "The endpoint of the KinD cluster API server."

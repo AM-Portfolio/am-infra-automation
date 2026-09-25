@@ -42,8 +42,8 @@ function Get-FleetEnv {
     InfraKubeconfig  = (Join-Path $env:USERPROFILE ".asrax\kubeconfig.am-$Env-infra.yaml")
     PlatformKubeconfig = (Join-Path $env:USERPROFILE ".asrax\kubeconfig.am-$Env-platform.yaml")
     AppsClusterName  = "am-$Env-apps"
-    MiddlewareCors   = "$Env-global-cors"
-    MiddlewareStrip  = "$Env-strip-prefix"
+    MiddlewareCors   = if ($Env -in @("prod", "preprod")) { "global-cors" } else { "$Env-global-cors" }
+    MiddlewareStrip  = if ($Env -in @("prod", "preprod")) { "strip-prefix-apps" } else { "$Env-strip-prefix" }
     GitopsEnvDir     = $Env
   }
 }

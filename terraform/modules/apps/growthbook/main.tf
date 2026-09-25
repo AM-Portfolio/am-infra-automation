@@ -31,9 +31,9 @@ resource "kubernetes_secret" "mongo" {
 
 resource "helm_release" "growthbook" {
   name             = "growthbook"
-  repository       = "oci://ghcr.io/growthbook/charts"
-  chart            = "growthbook"
+  chart            = "${path.module}/chart"
   namespace        = var.namespace
+  # Vendored OCI chart (ghcr.io/growthbook/charts) — VPS GHCR OCI pulls return 403.
   version          = var.chart_version
   create_namespace = false
   wait             = true

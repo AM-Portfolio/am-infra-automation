@@ -610,15 +610,58 @@ resource "null_resource" "vault_test_users" {
       if (-not $env:VAULT_TOKEN) { Write-Output 'skip_vault_no_token'; exit 0 }
       $map = $env:USERS_JSON | ConvertFrom-Json
       $data = @{}
-      foreach ($p in $map.PSObject.Properties) { $data[$p.Name] = $p.Value }
+      foreach ($p in $map.PSObject.Properties) { $data[$p.Name] = [string]$p.Value }
+      if ($data.ContainsKey('am-admin-test')) {
+        $data['admin_username'] = 'am-admin-test'
+        $data['admin_password'] = $data['am-admin-test']
+        $data['AM_ADMIN_TEST_USERNAME'] = 'am-admin-test'
+        $data['AM_ADMIN_TEST_PASSWORD'] = $data['am-admin-test']
+      }
+      if ($data.ContainsKey('am-user-test')) {
+        $data['user_username'] = 'am-user-test'
+        $data['user_password'] = $data['am-user-test']
+        $data['AM_USER_TEST_USERNAME'] = 'am-user-test'
+        $data['AM_USER_TEST_PASSWORD'] = $data['am-user-test']
+      }
       $path = "apps/data/dev/infra/keycloak-test-users"
-      $body = @{ data = @{ data = $data } } | ConvertTo-Json -Depth 5
+      # KV v2 body is {"data": <secret map>} — do not double-nest.
+      $body = @{ data = $data } | ConvertTo-Json -Depth 5 -Compress
       try {
         Invoke-RestMethod -Method Post -Uri "$($env:VAULT_ADDR)/v1/$path" -Headers @{ 'X-Vault-Token' = $env:VAULT_TOKEN } -ContentType 'application/json' -Body $body | Out-Null
         Write-Output "vault_ok=$path"
       } catch {
-        Write-Output "vault_warn=$path err=$($_.Exception.Message)"
+        throw "vault_fail=$path err=$($_.Exception.Message)"
       }
+    PS
+  }
+
+  depends_on = [module.keycloak]
+}
+
+resource "null_resource" "write_keycloak_admin_env" {
+  triggers = {
+    admin_pw   = sha256(module.keycloak.admin_password)
+    admin_user = module.keycloak.admin_user
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["PowerShell", "-NoProfile", "-Command"]
+    environment = {
+      KC_ADMIN_USER = module.keycloak.admin_user
+      KC_ADMIN_PASS = module.keycloak.admin_password
+      KC_REALM      = "am-realm"
+      OUT_FILE      = replace(pathexpand("~/.asrax/credentials.d/keycloak-kind-fleet-dev.env"), "\\", "/")
+    }
+    command = <<-PS
+      $ErrorActionPreference = 'Stop'
+      $dir = Split-Path -Parent $env:OUT_FILE
+      New-Item -ItemType Directory -Force -Path $dir | Out-Null
+      @(
+        "KEYCLOAK_ADMIN_USER=$($env:KC_ADMIN_USER)",
+        "KEYCLOAK_ADMIN_PASSWORD=$($env:KC_ADMIN_PASS)",
+        "KEYCLOAK_REALM=$($env:KC_REALM)"
+      ) | Set-Content -Path $env:OUT_FILE -Encoding ascii
+      Write-Output "wrote $($env:OUT_FILE)"
     PS
   }
 
