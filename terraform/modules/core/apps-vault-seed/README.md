@@ -16,3 +16,8 @@
 # Store creds: ~/.asrax/credentials.d/dev-infra-stores.env
 # Vault token: ~/.asrax/vault-dev-infra.json
 # Placeholders (`<env>-fleet-…`) are intentional; replace real third-party secrets in Vault when ready.
+
+## Keycloak admin
+
+Password comes from platform `write_keycloak_admin_env` ? credentials env file consumed by vault-apps. Never one-shot `vault kv patch` scripts.
+

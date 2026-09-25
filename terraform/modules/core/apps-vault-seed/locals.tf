@@ -1,12 +1,14 @@
 locals {
-  # Host naming: prod uses bare names (postgres.asrax.in); others use -<env> suffix.
+  # Host naming: prod uses bare Phase-2/3 names; others use -<env> suffix.
+  # Auth = Keycloak public host (auth*.asrax.in). Quarkus KC has no /auth context path.
   host_suffix = var.env == "prod" ? "" : "-${var.env}"
   pg_host     = "postgres${local.host_suffix}.${var.domain}"
-  mongo_host  = "mongodb${local.host_suffix}.${var.domain}"
+  mongo_host  = var.env == "prod" ? "mongo.${var.domain}" : "mongodb-${var.env}.${var.domain}"
   redis_host  = "redis${local.host_suffix}.${var.domain}"
   kafka_host  = "kafka${local.host_suffix}.${var.domain}:9092"
-  influx_host = "influxdb${local.host_suffix}.${var.domain}"
-  kc_host     = "https://keycloak${local.host_suffix}.${var.domain}"
+  influx_host = var.env == "prod" ? "influx.${var.domain}" : "influxdb-${var.env}.${var.domain}"
+  auth_host   = var.env == "prod" ? "auth.${var.domain}" : "auth-${var.env}.${var.domain}"
+  kc_host     = "https://${local.auth_host}"
   ui_base = coalesce(
     var.ui_base_url != "" ? var.ui_base_url : null,
     var.env == "prod" ? "https://am.${var.domain}" : "https://am-${var.env}.${var.domain}"
@@ -17,12 +19,12 @@ locals {
 
   # Shared keys merged into every services/* path (pods that mount service secrets).
   base_service = {
-    KEYCLOAK_URL         = "${local.kc_host}/auth"
+    KEYCLOAK_URL         = local.kc_host
     KEYCLOAK_REALM       = var.keycloak_realm
-    OIDC_ISSUER          = "${local.kc_host}/auth/realms/${var.keycloak_realm}"
-    OIDC_DISCOVERY_URL   = "${local.kc_host}/auth/realms/${var.keycloak_realm}/.well-known/openid-configuration"
-    OIDC_JWKS_URL        = "${local.kc_host}/auth/realms/${var.keycloak_realm}/protocol/openid-connect/certs"
-    OIDC_TOKEN_URL       = "${local.kc_host}/auth/realms/${var.keycloak_realm}/protocol/openid-connect/token"
+    OIDC_ISSUER          = "${local.kc_host}/realms/${var.keycloak_realm}"
+    OIDC_DISCOVERY_URL   = "${local.kc_host}/realms/${var.keycloak_realm}/.well-known/openid-configuration"
+    OIDC_JWKS_URL        = "${local.kc_host}/realms/${var.keycloak_realm}/protocol/openid-connect/certs"
+    OIDC_TOKEN_URL       = "${local.kc_host}/realms/${var.keycloak_realm}/protocol/openid-connect/token"
     OIDC_AUDIENCE        = "account"
     AUTH_UI_BASE_URL     = local.ui_base
     JWT_SECRET           = "${var.env}-fleet-jwt-placeholder"
@@ -34,6 +36,7 @@ locals {
   }
 
   # Resolve catalog values: null/empty → fleet placeholder; expand __UI_BASE__ / __ENV__.
+  # KEYCLOAK_ADMIN_* skipped here — injected from var.keycloak_admin_* (never placeholders).
   catalog_resolved = {
     for svc, cfg in local.catalog.services : svc => {
       for k, v in try(cfg.keys, {}) :
@@ -46,8 +49,24 @@ locals {
           var.env
         )
       )
+      if !startswith(k, "KEYCLOAK_ADMIN_")
     }
   }
+
+  kc_admin_overlay = {
+    KEYCLOAK_ADMIN_USER     = var.keycloak_admin_user
+    KEYCLOAK_ADMIN_PASSWORD = var.keycloak_admin_password
+  }
+
+  # Services that declare KEYCLOAK_ADMIN_* in catalog (identity always).
+  services_needing_kc_admin = toset(concat(
+    ["am-identity"],
+    [
+      for svc, cfg in local.catalog.services : svc
+      if contains(keys(try(cfg.keys, {})), "KEYCLOAK_ADMIN_PASSWORD")
+        || contains(keys(try(cfg.keys, {})), "KEYCLOAK_ADMIN_USER")
+    ]
+  ))
 
   # psycopg URLs for Python agents (qa-agent store)
   qa_pg_url = "postgresql+psycopg://${var.postgres_user}:${var.postgres_password}@${local.pg_host}:5432/${var.postgres_db}"
@@ -56,6 +75,7 @@ locals {
     for svc, keys in local.catalog_resolved : svc => merge(
       local.base_service,
       keys,
+      contains(local.services_needing_kc_admin, svc) ? local.kc_admin_overlay : {},
       try(var.extra_service_data[svc], {}),
       svc == "am-qa-agents" ? {
         QA_AGENT_DATABASE_URL = local.qa_pg_url
@@ -70,6 +90,12 @@ locals {
       } : {}
     )
   }
+
+  identity_admin_password = try(local.services_data["am-identity"]["KEYCLOAK_ADMIN_PASSWORD"], "")
+  identity_admin_is_placeholder = (
+    local.identity_admin_password == "" ||
+    endswith(local.identity_admin_password, "-fleet-keycloak-admin-password")
+  )
 
   # Domain path used by qa-agent Helm (apps/data/<env>/runtime/modules/qa)
   runtime_modules_data = {

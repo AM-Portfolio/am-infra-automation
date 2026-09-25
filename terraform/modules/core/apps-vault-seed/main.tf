@@ -5,6 +5,16 @@ resource "vault_kv_secret_v2" "infra_postgres" {
   data_json           = jsonencode(local.infra_postgres)
 }
 
+resource "terraform_data" "require_keycloak_admin" {
+  input = var.keycloak_admin_password
+  lifecycle {
+    precondition {
+      condition     = length(var.keycloak_admin_password) >= 8 && !local.identity_admin_is_placeholder
+      error_message = "apps-vault-seed requires keycloak_admin_password from platform Keycloak (refuse empty or *-fleet-keycloak-admin-password placeholders)."
+    }
+  }
+}
+
 resource "vault_kv_secret_v2" "infra_mongodb" {
   mount               = var.vault_mount
   name                = "${var.env}/infra/mongodb"
@@ -54,6 +64,8 @@ resource "vault_kv_secret_v2" "services" {
   name                = "${var.env}/services/${each.key}"
   delete_all_versions = false
   data_json           = jsonencode(each.value)
+
+  depends_on = [terraform_data.require_keycloak_admin]
 }
 
 resource "vault_kv_secret_v2" "runtime_modules" {
