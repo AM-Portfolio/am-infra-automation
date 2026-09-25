@@ -1,0 +1,4 @@
+# SUPERSEDED — owned by Terraform:
+#   modules/core/apps-traefik-bridge
+#   kind-fleet/prod/platform/apps-bridge.tf
+# Do not kubectl apply this file.
