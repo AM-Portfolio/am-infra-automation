@@ -7,23 +7,47 @@
 | Infra stores | `terraform/modules/core/store-sizing` |
 | Platform apps | `terraform/modules/core/platform-sizing` |
 
+**Prod stand-up (host + Kind + which row to take):** [`docs/kind-fleet-clusters/prod/SIZING.md`](../kind-fleet-clusters/prod/SIZING.md) — serve-first **64 GB**, take **`environment=prod`** rows from tables below.  
+**Agent summary:** skill `am-kind-fleet` `reference/sizing.md`.
+
 ## Rules
 
 - Env token ∈ `{dev, prod, dr}` (never `local` / `preprod`).
 - Request ≤ limit; CPU request ≥ **50m**.
 - **DR limits = prod**; **prod requests ≥ DR** (DR requests ≈ 70% of prod).
-- Laptop / Kind defaults = **dev**.
+- **Default row = `dev`** (module comment + laptop `kind-fleet/dev`). **Prod = `prod` row** via `kind-fleet/prod/*` `local.env = "prod"`.
 - Wrapper `local.env` must match the folder (`kind-fleet/dev|prod|dr/...`).
+
+### Fleet host inventory
+
+| Env | Host | vCPU | RAM | SSD |
+|-----|------|------|-----|-----|
+| dev (default TF row) | Laptop | 12 | 32 GB | 200 GB |
+| prod (use on VPS1) | VPS1 | 8 | 64 GB | 500 GB |
+| prod (optional later) | After obs offload | 6 | 36 GB | 500 GB |
+| dr | VPS3 | 8 | 32 GB | 500 GB |
 
 ## When prod starts
 
-1. Open this file + confirm table matches the TF module outputs.
-2. On VPS1: `kind-fleet/prod/{stores,platform}` with `environment=prod` — do **not** apply from laptop.
-3. On VPS3: same with `environment=dr`.
-4. Verify: `kubectl … get pods -o custom-columns=NAME:.metadata.name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,…`
+1. Confirm **prod** rows in this file match `store-sizing` / `platform-sizing` `locals.sizes.prod`.
+2. Follow [`prod/SIZING.md`](../kind-fleet-clusters/prod/SIZING.md) for Kind nodes (infra two / apps+platform one).
+3. On VPS1: `kind-fleet/prod/{stores,platform}` with `environment=prod` — do **not** apply from laptop.
+4. Verify: `kubectl … get pods -o custom-columns=NAME:.metadata.name,CPU_REQ:…,MEM_REQ:…`
 5. Domain smoke only (`*.asrax.in`); no port-forward.
 
----
+### Quick: default (dev) vs prod — stores
+
+| Store | Default (dev) | Prod (VPS1) |
+|-------|---------------|-------------|
+| postgresql | 50m/500m · 256Mi/1Gi · 5Gi | **250m/1000m · 1Gi/2Gi · 16Gi** |
+| mongodb | 50m/500m · 512Mi/1Gi · 5Gi | **250m/1000m · 1Gi/2Gi · 16Gi** |
+| redis | 50m/200m · 256Mi/512Mi · 1Gi · max 256mb | **100m/400m · 256Mi/1Gi · 4Gi · max 768mb** |
+| kafka | 50m/500m · 512Mi/1Gi · 5Gi | **200m/1000m · 1Gi/2Gi · 10Gi** |
+| influxdb | 50m/500m · 512Mi/1Gi · 5Gi | **100m/500m · 1Gi/2Gi · 5Gi** |
+| minio | 50m/500m · 256Mi/512Mi · 5Gi | **200m/1000m · 512Mi/2Gi · 20Gi** |
+| vault | 50m/200m · 128Mi/256Mi | **100m/500m · 256Mi/512Mi** |
+
+Platform prod examples: Keycloak **500m/1Gi→2Gi** (dev 250m/768Mi→1Gi); Lago API **500m/1Gi→4Gi** (dev 200m/512Mi→2Gi). Full matrix below.
 
 ## Infra (`store-sizing`)
 
