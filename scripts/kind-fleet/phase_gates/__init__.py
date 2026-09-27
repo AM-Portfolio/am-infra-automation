@@ -51,6 +51,8 @@ def _env_defaults(env: str) -> dict[str, str]:
             "kube_infra": "/data/am-state/kubeconfig.am-prod-infra.yaml",
             "kube_platform": "/data/am-state/kubeconfig.am-prod-platform.yaml",
             "realm": "am-realm",
+            "apps_ns": "am-apps-prod",
+            "agents_ns": "am-agents-prod",
         }
     if env == "dev":
         home = Path.home()
@@ -65,6 +67,23 @@ def _env_defaults(env: str) -> dict[str, str]:
             "kube_infra": str(home / ".asrax" / "kubeconfig.am-dev-infra.yaml"),
             "kube_platform": str(home / ".asrax" / "kubeconfig.am-dev-platform.yaml"),
             "realm": "am-realm",
+            "apps_ns": "am-apps-dev",
+            "agents_ns": "am-agents-dev",
+        }
+    if env == "dr":
+        return {
+            "domain": "asrax.in",
+            "am_host": "https://am-dr.asrax.in",
+            "auth_host": "https://auth-dr.asrax.in",
+            "vault_addr": "https://vault-dr.asrax.in",
+            "vault_keys": "/data/am-state/vault-dr-infra.json",
+            "kc_env": "/data/am-state/credentials/dr-keycloak-admin.env",
+            "kube_apps": "/data/am-state/kubeconfig.am-dr-apps.yaml",
+            "kube_infra": "/data/am-state/kubeconfig.am-dr-infra.yaml",
+            "kube_platform": "/data/am-state/kubeconfig.am-dr-platform.yaml",
+            "realm": "am-realm",
+            "apps_ns": "am-apps-dr",
+            "agents_ns": "am-agents-dr",
         }
     raise GateError(f"unsupported env={env}")
 
@@ -436,6 +455,7 @@ def gate_4f_apps(cfg: dict[str, str]) -> None:
 
 def gate_4g_remaining(cfg: dict[str, str]) -> None:
     """Remaining apps + agents: domain health smoke + no Vault sidecars + auth still works."""
+    env = cfg.get("_env", "prod")
     health_paths = (
         ("parser", "/parser/actuator/health"),
         ("notification", "/notification/actuator/health"),
@@ -451,10 +471,17 @@ def gate_4g_remaining(cfg: dict[str, str]) -> None:
             print(f"PASS 4g_{name} {path}={code}")
             continue
         if code != 200:
-            # fallbacks
             alts = {
                 "parser": ["/market/parser/actuator/health"],
                 "logging": ["/logging/health"],
+                "notification": [
+                    "/notifications/actuator/health",
+                    "/notifications/health",
+                ],
+                "subscription": [
+                    "/subscriptions/actuator/health",
+                    "/subscriptions/health",
+                ],
             }
             ok = False
             for alt in alts.get(name, []):
@@ -470,9 +497,11 @@ def gate_4g_remaining(cfg: dict[str, str]) -> None:
 
     # Spot-check Ready deploys + CSI volume / no vault-agent sidecar
     kube = cfg["kube_apps"]
+    apps_ns = cfg.get("apps_ns", f"am-apps-{env}")
+    agents_ns = cfg.get("agents_ns", f"am-agents-{env}")
     for ns, label in (
-        ("am-apps-prod", "app.kubernetes.io/instance=am-parser-prod"),
-        ("am-agents-prod", "app.kubernetes.io/instance=am-mcp-server-prod"),
+        (apps_ns, f"app.kubernetes.io/instance=am-parser-{env}"),
+        (agents_ns, f"app.kubernetes.io/instance=am-mcp-server-{env}"),
     ):
         out = _kubectl(
             kube,
@@ -534,7 +563,7 @@ WAVE_ALIASES = {
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Kind-fleet phase gates")
-    p.add_argument("--env", choices=("prod", "dev"), default="prod")
+    p.add_argument("--env", choices=("prod", "dev", "dr"), default="prod")
     p.add_argument("--wave", default="4d", help="4a|4b|4c|4d|4e|4f|4g|all")
     args = p.parse_args(argv)
     cfg = _env_defaults(args.env)

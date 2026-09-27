@@ -25,4 +25,11 @@ Wipe/reseed: `terraform/kind-fleet/*/apps/scripts/fresh-redeploy.ps1` applies **
 ## Keep vs retired
 
 - **Keep:** `phase_gates/`, `_debug_*`, `_vault_*` (read probes), `_argo_*` / `_closout_verify*`, `_qa_*`, `_check_*`, `_status_*`, `_spc_dump.sh`
-- **Retired:** `_retired/` — wave sync, `_fix_*`, hostAliases/pullSecrets patchers, `sync_keycloak_admin_to_vault.py` (SoT = platform `write_keycloak_admin_env` + vault-apps seed), superseded `_apps_bridge_hosts.yaml`
+- **Retired:** `_retired/` — wave sync, `_fix_*`, hostAliases/pullSecrets patchers, `sync_keycloak_admin_to_vault.py` (SoT = platform `write_keycloak_admin_env` + vault-apps seed), superseded `_apps_bridge_hosts.yaml`, **`dr-phase5-surgery/`** (DR SSH one-shots — do not recreate)
+
+## DR / prod same loop (no surgery)
+
+1. Gap → **am-gitops** overlay PR (or TF for edge/Vault/middleware) → merge `main`.
+2. `argocd app sync <app>-dr` (Manual policy; MCP write off → CLI on platform cluster).
+3. `PYTHONPATH=scripts/kind-fleet python -m phase_gates --env dr --wave 4d|4e|4f`.
+4. Fail → fix in git/TF again. Do **not** add `dr-phase*.sh` / `tmp-*.sh`.
