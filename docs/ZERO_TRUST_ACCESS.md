@@ -32,6 +32,8 @@ Terraform flags (defaults **false** until ZT-P1):
 
 ## Access applications
 
+**Operator list (IP enable per app):** [ACCESS_IP_APPS.md](ACCESS_IP_APPS.md)
+
 | App key | Hosts | Roles | IP |
 |---------|-------|-------|-----|
 | `product-ui` | `am-dev.asrax.in` (UI) | user, viewer, ops, admin, super_admin | optional |

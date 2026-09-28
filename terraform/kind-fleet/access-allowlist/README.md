@@ -1,3 +1,6 @@
 # Access allowlist registry — non-secret CIDRs for Cloudflare Access apps + data-plane TCP.
 # Update via GitHub Actions workflow_dispatch: .github/workflows/register-access-ip.yml
 # App keys: product-ui, obs, platform-ops, platform-tools, store-uis, data-plane
+#
+# Which apps need IP enabled (operator cheat sheet):
+#   docs/ACCESS_IP_APPS.md
