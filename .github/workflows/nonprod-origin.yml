@@ -47,6 +47,10 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is empty. Set it on GitHub Environment nonprod-vps / nonprod-local."
+            exit 1
+          fi
           chmod +x scripts/kind-fleet/nonprod-origin.sh
           # Empty optional secrets → unset so script defaults apply
           [[ -n "${CF_ACCOUNT_ID:-}" ]] || unset CF_ACCOUNT_ID

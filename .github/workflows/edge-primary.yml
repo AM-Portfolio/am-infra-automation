@@ -41,6 +41,10 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is empty. Set it on GitHub Environment edge-prod / edge-dr (Settings → Environments → Secrets)."
+            exit 1
+          fi
           chmod +x scripts/kind-fleet/edge-primary.sh
           if [[ "${DRY_RUN}" == "true" ]]; then
             ./scripts/kind-fleet/edge-primary.sh "${PRIMARY}" --dry-run
