@@ -32,7 +32,7 @@ resource "random_password" "app_users" {
 }
 
 resource "local_sensitive_file" "store_creds" {
-  filename = "/data/am-state/credentials/prod-infra-stores.env"
+  filename = "/data/am-state/credentials/prod/infra-stores.env"
   content  = <<-EOT
     # VPS1 am-prod-infra store creds. Not for git. Shared DB platform + per-module users.
     POSTGRES_USER=postgres
@@ -63,4 +63,26 @@ resource "local_sensitive_file" "store_creds" {
     REDIS_USER_LANGFUSE=${random_password.app_users["langfuse"].result}
     MINIO_USER_LANGFUSE=${random_password.app_users["langfuse"].result}
   EOT
+}
+
+resource "null_resource" "store_creds_compat_symlink" {
+  triggers = {
+    path = local_sensitive_file.store_creds.filename
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    environment = {
+      CANONICAL = local_sensitive_file.store_creds.filename
+      COMPAT    = "/data/am-state/credentials/prod-infra-stores.env"
+    }
+    command = <<-BASH
+      set -euo pipefail
+      mkdir -p "$(dirname "$CANONICAL")"
+      ln -sfn "$CANONICAL" "$COMPAT"
+      echo "compat symlink $COMPAT -> $CANONICAL"
+    BASH
+  }
+
+  depends_on = [local_sensitive_file.store_creds]
 }

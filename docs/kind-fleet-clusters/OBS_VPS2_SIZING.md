@@ -1,10 +1,16 @@
 # VPS2 obs sizing + retention (Phase 11)
 
-**Host:** prefer **≥16 GB** if platform third-parties colocated ([VPS2_DEV_PLATFORM.md](VPS2_DEV_PLATFORM.md)); obs-only floor **4 vCPU / 8 GB / ~200 GB SSD**.  
-**Stack:** Grafana + Loki + Prometheus + Tempo (+ Alloy local + Traefik/edge). When hub expands: Vault (`apps/data/dev` SoT) + OpenProject / Lago / Langfuse / n8n / GrowthBook / …  
-**TODO:** [TODO.md](TODO.md) Phase 11 + **11b**.  
+**Checkbox SoT:** [`OBS_DEPLOY.md`](OBS_DEPLOY.md) · [`obs/`](obs/).  
+**Host (locked):** **4 vCPU / 8 GB RAM / ~200 GB SSD** — obs hub only.  
+**Runtime:** **Docker Compose — no Kind** (Kind + kube-system wasted ~1.5–2 GB on this box).  
+**Stack:** Traefik + cloudflared + Grafana + Loki + Prometheus + Tempo + log-janitor.  
+**No external DB** for Grafana or Loki.
 
-**Role:** VPS2 = **ops / shared platform + credentials hub** — not Grafana-only. Laptop Kind is optional lab.
+**11b** (Vault `apps/data/dev`, OpenProject/…) needs **≥16 GB** — [VPS2_DEV_PLATFORM.md](VPS2_DEV_PLATFORM.md). **Refuse** 11b on this 8 GB host.
+
+**TODO historic:** [TODO.md](TODO.md) Phase 11 — prefer marking boxes in [`obs/`](obs/).
+
+**Role:** VPS2 = **shared log/metrics/traces hub** for all envs. Laptop Kind interim only until cutover ([GRAFANA_FLEET_DEV.md](GRAFANA_FLEET_DEV.md)).
 
 ---
 
@@ -21,21 +27,34 @@ VPS2 owns these **bare** hostnames — **no** `-dev` / `-prod` / `-dr`:
 
 **Shared ingest:** prod, DR, preprod (and laptop after cutover) Alloy / am-logging all push to the same Loki / Prometheus / Tempo URLs. Distinguish sources with labels (`environment`, `cluster`), not hostname.
 
-**Laptop Kind** currently hosts these bare FQDNs as an interim hub ([GRAFANA_FLEET_DEV.md](GRAFANA_FLEET_DEV.md)) until Phase 11 moves the stack to VPS2 — same names, no cutover rename.
+**Laptop Kind** currently hosts these bare FQDNs as an interim hub until Phase 11 moves the stack to VPS2 — same names, no cutover rename.
+
+---
+
+## Where data lives (no external DB)
+
+| Component | External DB? | Path on VPS2 |
+|-----------|--------------|--------------|
+| Loki (logs) | No — filesystem chunks/index | `/data/am-state/obs/loki/` |
+| Grafana | No — SQLite (UI/config only) | `/data/am-state/obs/grafana/` |
+| Prometheus | No — local TSDB | `/data/am-state/obs/prometheus/` |
+| Tempo | No — blocks on disk | `/data/am-state/obs/tempo/` |
+
+Grafana **queries** Loki/Prom/Tempo; it does **not** store fleet logs.
 
 ---
 
 ## Host budget (obs slice)
 
-If only Grafana/Loki/Prom/Tempo run on an 8 GB box:
-
 | Slice | Approx |
 |-------|--------|
-| OS + Docker + Kind + kube-system | ~1.5–2.0 GB |
-| Usable for obs pods | ~6.0–6.5 GB |
-| Disk for PVCs | ~150–170 GB (leave ~30 GB free) |
+| OS + Docker (no Kind) | ~0.6–0.8 GB |
+| Traefik + cloudflared | ~150–250 MB |
+| Usable for Grafana/Loki/Prom/Tempo | ~6.0–6.5 GB |
+| Leave free / page cache | ~1 GB |
+| Disk free / OS / images | **≥40–50 Gi** |
 
-**With platform hub (11b):** keep obs PVC table below; add headroom for Vault + PG + OpenProject/Lago/Langfuse/n8n/GB — target **16 GB+** host RAM or do not colocate.
+Compose `mem_limit` sum **≤ ~6.5 GB**.
 
 ---
 
@@ -53,31 +72,28 @@ Loki: `chunksCache` / `resultsCache` **off** on this box.
 
 ## Log cleanup (two layers)
 
-Retention alone is not enough under ingest spikes. Phase 11 must ship **both**:
-
 1. **Loki retention + compactor** — continuous delete of chunks older than **14d**.
-2. **CronJob `log-janitor`** — every **6h**:
-   - Check Loki PVC usage.
-   - If PVC **≥ 80%** full **or** on every run: force cleanup of data **older than retention** so free space returns even after a limit hit.
-   - Log success/failure to stdout (scraped into Loki).
+2. **log-janitor** (Compose cron / sidecar) every **6h**:
+   - Check Loki volume usage.
+   - If volume **≥ 80%** full **or** on every run: force cleanup older than retention.
+   - Log success/failure to stdout.
 
-Janitor prioritizes **Loki**. Tempo relies on its own 5d retention; janitor disk check may include Tempo PVC as secondary. **Never** shorten Prometheus **30d** from the janitor.
+Janitor prioritizes **Loki**. Tempo uses its own 5d retention. **Never** shorten Prometheus **30d** from the janitor.
 
 ---
 
-## Pod resources + PVC
+## Container resources + volumes
 
-| Component | CPU req → lim | Mem req → lim | PVC |
-|-----------|---------------|---------------|-----|
-| Grafana | `200m` → `750m` | `512Mi` → `1Gi` | 10 Gi |
-| Loki | `400m` → `1500m` | `1.5Gi` → `2.5Gi` | **80 Gi** |
-| Prometheus | `200m` → `1000m` | `768Mi` → `1.5Gi` | **40 Gi** |
-| Tempo | `250m` → `1000m` | `1Gi` → `2Gi` | **50 Gi** |
-| Alloy (VPS2 local) | `50m` → `200m` | `128Mi` → `256Mi` | — |
-| Traefik / edge | `50m` → `200m` | `64Mi` → `256Mi` | — |
-| log-janitor CronJob | `50m` → `200m` | `64Mi` → `128Mi` | — (ephemeral) |
+| Component | CPU lim | Mem lim | Volume |
+|-----------|---------|---------|--------|
+| Grafana | ~0.5 | 512Mi–1Gi | **5–10 Gi** |
+| Loki | ~1.0–1.2 | 1.5–2.0 Gi | **60–70 Gi** |
+| Prometheus | ~0.75 | 768Mi–1.2Gi | **30–35 Gi** |
+| Tempo | ~0.75 | 1–1.5 Gi | **30–40 Gi** |
+| Traefik / cloudflared | ~0.25 | ≤256Mi | — |
+| log-janitor | ~0.2 | ≤128Mi | — |
 
-PVC total ≈ **180 Gi** → fits ~200 GB with OS/Docker headroom. Sum of **requests** should stay ≤ ~5.5–6 GB RAM.
+Volume total ≈ **125–155 Gi** data + ≥40–50 Gi free on ~200 GB.
 
 ---
 
@@ -85,12 +101,13 @@ PVC total ≈ **180 Gi** → fits ~200 GB with OS/Docker headroom. Sum of **requ
 
 1. Shorten **Tempo** retention (e.g. 5d → 3d).
 2. Shorten **Loki** retention (e.g. 14d → 7d) and confirm janitor is running.
-3. **Do not** cut Prometheus below **30d** unless metrics PVC itself is full.
+3. **Do not** cut Prometheus below **30d** unless metrics volume itself is full.
 
 ---
 
 ## Related
 
+- Deploy pack: [OBS_DEPLOY.md](OBS_DEPLOY.md) · [obs/](obs/)
 - Phase 5.2 security: [PHASE5_VPS_SECURITY.md](PHASE5_VPS_SECURITY.md)
-- VPS2 ops/dev + credentials hub: [VPS2_DEV_PLATFORM.md](VPS2_DEV_PLATFORM.md)
+- VPS2 platform hub (later): [VPS2_DEV_PLATFORM.md](VPS2_DEV_PLATFORM.md)
 - Fleet Grafana interim (laptop): [GRAFANA_FLEET_DEV.md](GRAFANA_FLEET_DEV.md)

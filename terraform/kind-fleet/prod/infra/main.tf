@@ -14,6 +14,8 @@ module "cluster" {
   config_output_path   = "/data/am-state/kubeconfig.am-prod-infra.yaml"
   enable_data_mount    = true
   data_host_path       = "/data/am-infra"
+  oidc_issuer_url      = "https://auth.asrax.in/realms/am-realm"
+  oidc_client_id       = "kubectl"
 }
 
 output "cluster_name" {

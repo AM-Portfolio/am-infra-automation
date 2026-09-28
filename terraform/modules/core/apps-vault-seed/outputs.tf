@@ -25,3 +25,19 @@ output "identity_keycloak_admin_user" {
 output "identity_oidc_issuer" {
   value = try(local.services_data["am-identity"]["OIDC_ISSUER"], "")
 }
+
+output "store_hosts_profile" {
+  value = var.store_hosts
+}
+
+output "mongo_host" {
+  value = local.mongo_host
+}
+
+output "redis_host" {
+  value = local.redis_host
+}
+
+output "postgres_host" {
+  value = local.pg_host
+}

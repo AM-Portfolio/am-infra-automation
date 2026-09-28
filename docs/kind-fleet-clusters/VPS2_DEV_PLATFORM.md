@@ -3,7 +3,9 @@
 **Role:** VPS2 is the **ops + shared platform hub** — not obs-only.  
 It owns shared observability (bare `*.asrax.in`), **dev credential SoT** in Vault (`apps/data/dev/`), and G24 third-party / platform consoles that should outlive a laptop wipe.
 
-**Related:** [OBS_VPS2_SIZING.md](OBS_VPS2_SIZING.md) · [GRAFANA_FLEET_DEV.md](GRAFANA_FLEET_DEV.md) (interim laptop hub) · [TODO.md](TODO.md) Phase 11 / 11b.
+**Related:** [OBS_DEPLOY.md](OBS_DEPLOY.md) · [obs/](obs/) (Phase 11 checkbox SoT — Docker, no Kind) · [OBS_VPS2_SIZING.md](OBS_VPS2_SIZING.md) · [GRAFANA_FLEET_DEV.md](GRAFANA_FLEET_DEV.md) (interim laptop hub) · [TODO.md](TODO.md) Phase 11 / 11b.
+
+**Note:** Phase 11 obs on **4c/8GB** is Compose-only. This 11b platform hub doc assumes **≥16 GB** — do not colocate OpenProject/Vault/stores on the 8 GB obs box.
 
 ---
 

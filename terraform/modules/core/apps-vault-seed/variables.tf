@@ -77,3 +77,18 @@ variable "extra_service_data" {
   default     = {}
   description = "Optional per-service key overrides merged last (e.g. real Upstox tokens)."
 }
+
+variable "store_hosts" {
+  type        = string
+  default     = "env"
+  description = <<-EOT
+    Store hostname profile:
+      env          — postgres|mongodb|redis-<env>.asrax.in (laptop Kind dig / classic nonprod)
+      contabo_prod — Contabo shared stores (postgres|mongo|redis.asrax.in). Use for Contabo dig
+                     NS on am-vps-nonprod: there is no separate dig Mongo/Redis — prod Contabo one.
+  EOT
+  validation {
+    condition     = contains(["env", "contabo_prod"], var.store_hosts)
+    error_message = "store_hosts must be env or contabo_prod."
+  }
+}

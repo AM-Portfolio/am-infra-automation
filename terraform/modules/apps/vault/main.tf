@@ -19,6 +19,13 @@ resource "helm_release" "vault" {
       }
       ha = { enabled = false }
       standalone = { enabled = true }
+      # Prometheus metrics for Alloy scrape (Platform / Vault)
+      annotations = {
+        "prometheus.io/scrape" = "true"
+        "prometheus.io/port"   = "8200"
+        "prometheus.io/path"   = "/v1/sys/metrics"
+        "prometheus.io/param_format" = "prometheus"
+      }
       service = merge(
         {
           enabled = true

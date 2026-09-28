@@ -8,6 +8,9 @@ module "alloy_logs" {
   create_namespace = false
   cluster_name     = "am-dev-platform"
   environment      = local.env
+  vps              = "vps-dev"
+  vps_name         = "VPS_DEV"
+  vps_ip           = "laptop"
   loki_push_url    = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
   # Same-cluster remote_write (receiver enabled on prometheus-server)
   prometheus_remote_write_url = "http://prometheus-server.monitoring.svc.cluster.local/api/v1/write"

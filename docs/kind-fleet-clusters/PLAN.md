@@ -52,8 +52,8 @@ Prereq → Implement → ~/.asrax + mcp-sync → Test (this phase) → Test (gro
 - **Phase P first — start and test all:** IPs from [VPS/.env](../../../VPS/.env) (`VPS_IP`, `VPS_2_IP`, `VPS_3_IP`). Laptop local/dev Docker + SSH all three VPS + Cloudflare MCP (zone/tunnels/R2). **Then** Phase 0 dump, then Phase C. No secrets from `.env` in git.
 - Local clean = **Kind/k8s in Docker only** (not laptop wipe). VPS clean = Kind + unused Docker to **free disk**.
 - After clean: security `am-ops` on each VPS; layer MCP gates **per host**.
-- **VPS3 full DR stays running.** **Postgres primary→standby + Mongo replica** over WireGuard (G20). R2 dump = disaster backup only. ~10k / 6 months → 32 GB DR.
-- **Cloudflare Load Balancing auto-failover** to VPS3 when `/health` on `am`+`auth` fails. **No auto-failback.** Planned wipe: stop VPS1 Kind so health fails, then LB moves traffic.
+- **VPS3 full DR stays running.** **Postgres preferred writer on DR + Contabo standby** (G20; promote Contabo on DR failure). R2 dump = disaster backup only. ~10k / 6 months → 32 GB DR.
+- **Cloudflare Load Balancing:** DR pool **default**, Contabo **fallback** when `/health` (and auth/vault probes) on DR fail. **No auto-failback** (`dr_pool_enabled`). Planned wipe: stop VPS3 Kind so health fails, then LB moves traffic to Contabo.
 - VPS2 Grafana **parallel**. No Grafana on rebuilt VPS1. No `kagent`.
 - One Keycloak `am-realm` login for **all UIs** (product + infra consoles). Domain per UI; OIDC after Vault rewrite (G24).
 - Phase 2 order (same on **dev / prod / dr**): `kind create` → **Traefik + cloudflared + tunnel** → TCP exposer + DNS-only A → stores → **IngressRoutes** → **Test on domain (G27)** → **then** seed. Do not skip Edge. Tunnel origin is Traefik only (no per-Service bypass).
@@ -76,7 +76,7 @@ N/A — infra pack, no paper-trading / broker money.
 
 ## Locked: reduce downtime (low extra machinery)
 
-Do **not** add Cilium, a fourth VPS, or Kafka replica unless Phase 12 says so. **Postgres streaming + Mongo replica** are P0 (G20). VPS3 is warm always-on DR. Cloudflare LB auto-redirects. Dumps do **not** sync DR.
+Do **not** add Cilium, a fourth VPS, or Kafka replica unless Phase 12 says so. **Postgres streaming + Mongo replica** are P0 (G20) with **DR preferred writer**. Cloudflare LB auto-redirects **DR → Contabo** on DR failure. Dumps do **not** sync DR.
 
 ```mermaid
 flowchart TD
@@ -118,16 +118,16 @@ Same layer loop on each track. Hosts may run **in parallel**. Do not skip MCP ga
 | Track | Host | Clusters | After infra |
 |-------|------|----------|-------------|
 | Dev (optional lab) | laptop | `am-dev-*` slim | Product apps only until moved; **creds SoT on VPS2** |
-| Prod | VPS1 | `am-prod-infra` / `apps` / `platform` | Writer PG/Mongo; CF primary |
-| DR | VPS3 | `am-dr-*` | PG standby + Mongo secondary (G20); CF fallback |
+| Prod | VPS1 | `am-prod-infra` / `apps` / `platform` | PG/Mongo **standby / Contabo fallback**; CF fallback pool |
+| DR | VPS3 | `am-dr-*` | PG/Mongo **preferred writer** (G20); CF **default** pool |
 | Ops + shared platform | VPS2 | `am-obs` + platform tools | Grafana/Prom/Loki/Tempo; Vault **`apps/data/dev`**; OpenProject/Lago/Langfuse/… — [VPS2_DEV_PLATFORM.md](VPS2_DEV_PLATFORM.md) |
 
 | Move | Why it cuts downtime | Extra cost |
 |------|----------------------|------------|
-| **Warm DR always running** | VPS3 stack stays up. Unplanned VPS1 death → CF LB fails `/health` → users already have a live DR | VPS3 ≥ 32 GB |
-| **CF LB auto-failover** | Primary pool VPS1, fallback VPS3. `am`+`auth` together. **No auto-failback** (human Phase 9) | CF Load Balancing + MCP |
+| **Warm DR always running** | VPS3 stack stays up as **primary**. Unplanned VPS3 death → CF LB fails DR `/health` → Contabo | VPS3 ≥ 32 GB |
+| **CF LB auto-failover** | Default pool **DR**, fallback **Contabo**. All bare HTTPS hosts. **No auto-failback** (human + `dr_pool_enabled`) | CF Load Balancing + MCP |
 | **Greenfield clean (C)** | Free VPS disk; local only deletes Kind. Then all four start from step 1 | Prod down until rebuilt |
-| **PG + Mongo realtime (G20)** | VPS1 primary → VPS3 standby/secondary over WireGuard. Login + positions live. Promote on failover | Private WG + promote script |
+| **PG + Mongo realtime (G20)** | VPS3 preferred writer → Contabo standby/secondary over WireGuard. Promote Contabo on DR failure | Private WG + promote |
 | **R2 disaster dump** | Daily from current primary. Both-VPS-dead only. Never restore onto a live replica | Daily cron |
 | **VPS2 not a gate for rebuild** | Grafana can move later. Do not block prod infra on buying obs | VPS2 parallel |
 | **Break-glass** | Time-boxed root / cluster-admin from provider console when disk-full or stuck STS. Day-2 stays `am-ops` | Process, not new software |
@@ -195,7 +195,7 @@ Full table: **[GAPS.md](GAPS.md)**. Locked G20–G27: replica, seed **after** do
 
 N/A for money. Infra state:
 
-- Prod writes only on the **current PG/Mongo primary** (VPS1 until failover).
+- Prod writes only on the **current PG/Mongo primary** (VPS3/DR until Contabo promote).
 - Sync to VPS3: **Postgres WAL + Mongo oplog** over WireGuard. R2 dump is not the sync path.
 - Terraform state stays on that host (not in git).
 
@@ -423,7 +423,7 @@ Do **not** start Kind on a VPS until that host’s Phase 5 sub-gate is green. **
 |------|------|
 | Prereq | Phase 5.3 WG up; VPS3 ≥ 32 GB; **VPS1 still serving** |
 | Implement | **G1:** `kind create` three clusters. DSN local (G4). Seed DBs from `asrax-db-backups` **as soon as they exist**. Repeat **Phase 4a–4g** on DR (Vault rewrite + G25 + am-gitops `dr/` waves + API verify). **PG standby + Mongo secondary** from VPS1 over WG. **No** restore-from-R2 cron on PG/Mongo |
-| Implement | CF MCP: `am-dr` / `auth-dr`; LB VPS1 primary / VPS3 fallback; `/health`; auto-failback off |
+| Implement | CF LB: DR default / Contabo fallback; `/health`+auth+vault; auto-failback off (`dr_pool_enabled`) |
 | MCP | Replica lag seconds; JWT from prod works on `am-dr` (G15); live quotes (G19); one portfolio read matches VPS1 |
 | Gate | DR running, replica healthy, **not** taking prod writes |
 

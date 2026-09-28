@@ -53,9 +53,16 @@ resource "helm_release" "argocd" {
       }
       cm = merge(
         {
-          url = "https://${local.argocd_host}"
-          "application.instanceLabelKey" = "argocd.argoproj.io/instance"
-          "admin.enabled"                = var.disable_local_admin ? "false" : "true"
+          url                              = "https://${local.argocd_host}"
+          "application.instanceLabelKey"   = "argocd.argoproj.io/instance"
+          "admin.enabled"                  = var.disable_local_admin ? "false" : "true"
+          # Traefik never fills Ingress status.loadBalancer → default Argo health = Progressing forever
+          "resource.customizations.health.networking.k8s.io_Ingress" = <<-LUA
+            hs = {}
+            hs.status = "Healthy"
+            hs.message = "Traefik Ingress (no loadBalancer status expected)"
+            return hs
+          LUA
         },
         var.oidc_issuer != "" ? {
           "oidc.config" = <<-OIDC
@@ -72,7 +79,7 @@ resource "helm_release" "argocd" {
       }
       rbac = {
         "policy.default" = "role:readonly"
-        "policy.csv"     = "g, admin, role:admin\ng, am-admin, role:admin\ng, ops, role:admin\ng, am-ops, role:admin\ng, viewer, role:readonly\ng, am-viewer, role:readonly\ng, user, role:readonly\ng, am-user, role:readonly\n"
+        "policy.csv"     = "g, am-admin, role:admin\ng, am-ops, role:readonly\ng, am-viewer, role:readonly\n"
       }
     }
     server = {
@@ -93,12 +100,30 @@ resource "helm_release" "argocd" {
       args = {
         appResyncPeriod = "60"
       }
+      metrics = {
+        enabled = true
+        service = {
+          annotations = {
+            "prometheus.io/scrape" = "true"
+            "prometheus.io/port"   = "8082"
+          }
+        }
+      }
       resources = {
         requests = { cpu = var.controller_cpu_request, memory = var.controller_memory_request }
         limits   = { cpu = var.controller_cpu_limit, memory = var.controller_memory_limit }
       }
     }
     repoServer = {
+      metrics = {
+        enabled = true
+        service = {
+          annotations = {
+            "prometheus.io/scrape" = "true"
+            "prometheus.io/port"   = "8084"
+          }
+        }
+      }
       resources = {
         requests = { cpu = var.repo_server_cpu_request, memory = var.repo_server_memory_request }
         limits   = { cpu = var.repo_server_cpu_limit, memory = var.repo_server_memory_limit }

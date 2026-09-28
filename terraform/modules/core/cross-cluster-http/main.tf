@@ -32,7 +32,13 @@ data "external" "backend_ip" {
 locals {
   domain_suffix = var.use_bare_fqdn || var.environment == "prod" ? "" : "-${var.environment}"
   fqdn          = "${var.host_label}${local.domain_suffix}.${var.root_domain}"
-  resolved_ip   = var.backend_ip != "" ? var.backend_ip : (
+  bare_fqdn     = "${var.host_label}.${var.root_domain}"
+  host_match = (
+    var.also_match_bare && local.fqdn != local.bare_fqdn
+    ? "Host(`${local.fqdn}`) || Host(`${local.bare_fqdn}`)"
+    : "Host(`${local.fqdn}`)"
+  )
+  resolved_ip = var.backend_ip != "" ? var.backend_ip : (
     var.backend_host != "" ? data.external.backend_ip[0].result.ip : ""
   )
 }
@@ -104,7 +110,7 @@ resource "kubectl_manifest" "ingressroute" {
         - web
         - websecure
       routes:
-        - match: Host(`${local.fqdn}`)
+        - match: ${local.host_match}
           kind: Rule
           services:
             - name: ${var.service_name}

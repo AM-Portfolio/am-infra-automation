@@ -37,6 +37,8 @@ module "cluster" {
   api_server_address = "0.0.0.0"
   vps_ip             = "203.174.22.129"
   config_output_path = local.apps_kubeconfig
+  oidc_issuer_url    = "https://auth.asrax.in/realms/am-realm"
+  oidc_client_id     = "kubectl"
 }
 
 resource "null_resource" "kubeconfig_asrax" {

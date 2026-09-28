@@ -1,0 +1,32 @@
+# Laptop am-dev-apps: control-plane + apps worker + agents worker (preprod-style).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: am-dev-apps
+networking:
+  apiServerAddress: "127.0.0.1"
+  apiServerPort: 6444
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.27.3
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "role=apps,workload=control-plane"
+  - role: worker
+    image: kindest/node:v1.27.3
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "role=apps,workload=apps"
+  - role: worker
+    image: kindest/node:v1.27.3
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "role=agents,workload=agents"

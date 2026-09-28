@@ -8,8 +8,9 @@ Auth stays env-suffixed (`auth-dev.asrax.in`, …). Distinguishing sources = lab
 
 | Phase | Where Grafana runs | Who owns bare `grafana`/`loki`/`prometheus`.asrax.in |
 |-------|--------------------|------------------------------------------------------|
-| **Target (Phase 11)** | **VPS2** obs hub | **Only** the Cloudflare tunnel on **VPS2** (same host as Grafana). See [VPS2_DEV_PLATFORM.md](VPS2_DEV_PLATFORM.md). |
-| **Interim (laptop Kind)** | `am-dev-platform` / `monitoring` | Laptop `asrax-dev-tunnel` on **infra** + Traefik bridges — temporary. Do **not** treat laptop as long-term owner of bare obs FQDNs. |
+| **SoT (Phase 11)** | **VPS2** Docker Compose hub (`compose/obs`) — **no Kind** · tunnel `asrax-obs-tunnel` | **Only** VPS2. See [OBS_DEPLOY.md](OBS_DEPLOY.md) · [obs/](obs/). |
+| **Interim (retired)** | was `am-dev-platform` / `monitoring` | Laptop `asrax-dev-tunnel` — bare Hosts **removed**; pods scaled to 0 ([obs/phase-4.md](obs/phase-4.md)). |
+| **Contabo/preprod LGTM (retired 2026-09-26)** | was Contabo Kind `monitoring` Grafana/Prom/Loki (+ PVCs) | **Removed** — Alloy shipper only on Contabo/ITSmart Kind; do not re-apply `am-infra/k8s/grafana` or `terraform/monitoring`. |
 
 After Docker/Kind restart, refresh bridge Endpoints (Kind IPs drift):
 
@@ -58,10 +59,10 @@ Sizing / Phase 11 VPS2: [OBS_VPS2_SIZING.md](OBS_VPS2_SIZING.md).
 
 | Cursor name | Target | Creds |
 |-------------|--------|--------|
-| **`grafana-dev`** | Fleet hub `https://grafana.asrax.in` | `credentials.d/grafana-dev.env` (SA token) |
-| `grafana` | Legacy Contabo (if still configured) | `credentials.d/observability.env` |
+| **`grafana-dev`** / **`grafana-obs`** | Fleet hub `https://grafana.asrax.in` (VPS2 compose/obs) | `credentials.d/grafana-dev.env` or `grafana-obs.env` |
+| `grafana` | **Retired Contabo** — do not use | was `credentials.d/observability.env` |
 
-Prefer **`grafana-dev`** MCP for fleet until VPS2 owns the hub permanently. Keep `AM_GRAFANA_MCP_WRITE=0` unless intentionally mutating.
+Prefer **`grafana-dev`** / **`grafana-obs`** MCP for the single ops Grafana. Contabo no longer runs Grafana. Keep `AM_GRAFANA_MCP_WRITE=0` unless intentionally mutating.
 
 ---
 

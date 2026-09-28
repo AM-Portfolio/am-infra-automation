@@ -23,6 +23,22 @@ locals {
       "psql -d postgres -tc \"SELECT 1 FROM pg_database WHERE datname='${spec.database != "" ? spec.database : user}'\" | grep -q 1 || psql -d postgres -c \"CREATE DATABASE ${spec.database != "" ? spec.database : user} OWNER ${user}\""
       if spec.database != "" || try(spec.createdb, false)
     ],
+    # Extra owned DBs (Temporal: temporal_visibility alongside temporal).
+    flatten([
+      for user, spec in var.postgresql_app_users : [
+        for db in try(spec.extra_databases, []) : [
+          "psql -d postgres -tc \"SELECT 1 FROM pg_database WHERE datname='${db}'\" | grep -q 1 || psql -d postgres -c \"CREATE DATABASE ${db} OWNER ${user}\"",
+          "psql -d ${db} -c \"ALTER DATABASE ${db} OWNER TO ${user}; GRANT ALL ON SCHEMA public TO ${user}; CREATE EXTENSION IF NOT EXISTS btree_gin; CREATE EXTENSION IF NOT EXISTS btree_gist;\" || true"
+        ]
+      ]
+    ]),
+    # Platform shared DB: extensions OpenProject/others need (superuser).
+    local.shared_mode ? [
+      "psql -d ${var.shared_database} -c 'CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS btree_gin;' || true",
+      # Schema apps on shared DB need CREATE for migrations/extensions (n8n, OpenProject, …).
+      "psql -d postgres -c \"DO \\$\\$ DECLARE r text; BEGIN FOR r IN SELECT unnest(ARRAY[${join(",", [for u, s in var.postgresql_app_users : "'${u}'" if length(try(s.schemas, [])) > 0 && s.database == "" && !try(s.createdb, false)])}]) LOOP BEGIN EXECUTE format('GRANT CREATE ON DATABASE ${var.shared_database} TO %I', r); EXCEPTION WHEN undefined_object THEN NULL; END; END LOOP; END \\$\\$;\" || true",
+      "psql -d ${var.shared_database} -c \"DO \\$\\$ DECLARE r text; BEGIN FOR r IN SELECT unnest(ARRAY[${join(",", [for u, s in var.postgresql_app_users : "'${u}'" if length(try(s.schemas, [])) > 0 && s.database == "" && !try(s.createdb, false)])}]) LOOP BEGIN EXECUTE format('GRANT USAGE, CREATE ON SCHEMA public TO %I', r); EXCEPTION WHEN undefined_object THEN NULL; END; END LOOP; END \\$\\$;\" || true"
+    ] : [],
     [
       for user, spec in var.postgresql_app_users :
       "psql -d postgres -c 'ALTER ROLE ${user} WITH CREATEDB'"
@@ -33,10 +49,20 @@ locals {
       "psql -d postgres -c 'ALTER ROLE ${user} SET search_path TO public'"
       if spec.database != "" || try(spec.createdb, false)
     ],
+    # Extra owned DBs pin search_path to public (Temporal schema tool).
+    flatten([
+      for user, spec in var.postgresql_app_users : [
+        for db in concat(
+          compact([spec.database != "" ? spec.database : (try(spec.createdb, false) ? user : "")]),
+          try(spec.extra_databases, [])
+        ) : "psql -d postgres -c 'ALTER ROLE ${user} IN DATABASE ${db} SET search_path TO public' || true"
+      ] if spec.database != "" || try(spec.createdb, false) || length(try(spec.extra_databases, [])) > 0
+    ]),
     # Dedicated DB ownership (restored dumps often leave tables owned by postgres).
     [
       for user, spec in var.postgresql_app_users :
-      "psql -d ${spec.database != "" ? spec.database : user} -c \"ALTER DATABASE ${spec.database != "" ? spec.database : user} OWNER TO ${user}; GRANT ALL ON SCHEMA public TO ${user}; REASSIGN OWNED BY postgres TO ${user}; GRANT ALL ON ALL TABLES IN SCHEMA public TO ${user}; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO ${user}; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${user}; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${user}; DO \\$\\$ DECLARE r record; BEGIN FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP EXECUTE format('ALTER TABLE public.%I OWNER TO ${user}', r.tablename); END LOOP; FOR r IN SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public' LOOP EXECUTE format('ALTER SEQUENCE public.%I OWNER TO ${user}', r.sequence_name); END LOOP; END \\$\\$;\""
+      # REASSIGN may fail on empty DBs (system catalog objects); do not fail the job.
+      "psql -d ${spec.database != "" ? spec.database : user} -c \"ALTER DATABASE ${spec.database != "" ? spec.database : user} OWNER TO ${user}; GRANT ALL ON SCHEMA public TO ${user}; CREATE EXTENSION IF NOT EXISTS btree_gin; CREATE EXTENSION IF NOT EXISTS btree_gist;\" && psql -d ${spec.database != "" ? spec.database : user} -c \"REASSIGN OWNED BY postgres TO ${user}\" || true; psql -d ${spec.database != "" ? spec.database : user} -c \"GRANT ALL ON ALL TABLES IN SCHEMA public TO ${user}; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO ${user}; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${user}; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${user}; DO \\$\\$ DECLARE r record; BEGIN FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP EXECUTE format('ALTER TABLE public.%I OWNER TO ${user}', r.tablename); END LOOP; FOR r IN SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public' LOOP EXECUTE format('ALTER SEQUENCE public.%I OWNER TO ${user}', r.sequence_name); END LOOP; END \\$\\$;\""
       if spec.database != "" || try(spec.createdb, false)
     ],
     local.shared_mode ? flatten([
@@ -160,7 +186,8 @@ resource "kubernetes_job" "mongo_users" {
               ],
               [
                 for user, spec in var.mongodb_app_users :
-                "mongosh --quiet \"$MONGO_URI\" --eval 'try { db.getSiblingDB(\"${local.shared_mode && spec.database == "" ? var.shared_database : (spec.database != "" ? spec.database : user)}\").createUser({ user: \"${user}\", pwd: \"${spec.password}\", roles: [{ role: \"${spec.role != "" ? spec.role : "readWrite"}\", db: \"${local.shared_mode && spec.database == "" ? var.shared_database : (spec.database != "" ? spec.database : user)}\" }] }) } catch (e) { if (!/already exists/.test(e.message)) throw e }'"
+                # Create on admin so authSource=admin (GrowthBook) works; role scopes to app DB.
+                "mongosh --quiet \"$MONGO_URI\" --eval 'try { db.getSiblingDB(\"admin\").createUser({ user: \"${user}\", pwd: \"${spec.password}\", roles: [{ role: \"${spec.role != "" ? spec.role : "readWrite"}\", db: \"${local.shared_mode && spec.database == "" ? var.shared_database : (spec.database != "" ? spec.database : user)}\" }] }) } catch (e) { if (/already exists/.test(e.message)) { db.getSiblingDB(\"admin\").updateUser(\"${user}\", { pwd: \"${spec.password}\", roles: [{ role: \"${spec.role != "" ? spec.role : "readWrite"}\", db: \"${local.shared_mode && spec.database == "" ? var.shared_database : (spec.database != "" ? spec.database : user)}\" }] }); } else { throw e; } }'"
               ]
             ))
           ]

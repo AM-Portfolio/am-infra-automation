@@ -24,19 +24,20 @@ variable "api_server_port" {
   default     = null
 
   validation {
-    condition     = var.api_server_port == null || contains([6443, 6444, 6445], var.api_server_port)
+    # Ternary: TF evaluates both sides of ||, and contains() rejects null.
+    condition     = var.api_server_port == null ? true : contains([6443, 6444, 6445], var.api_server_port)
     error_message = "api_server_port must be 6443, 6444, or 6445."
   }
 }
 
 variable "node_shape" {
-  description = "one = single control-plane (dev/dr/obs). two = control-plane + worker (prod). Leave null to derive from env."
+  description = "one = single control-plane. two = CP + one worker (prod infra). split = CP + apps worker + agents worker (apps Kind). Leave null to derive from env."
   type        = string
   default     = null
 
   validation {
-    condition     = var.node_shape == null || contains(["one", "two"], var.node_shape)
-    error_message = "node_shape must be one or two."
+    condition     = var.node_shape == null ? true : contains(["one", "two", "split"], var.node_shape)
+    error_message = "node_shape must be one, two, or split."
   }
 }
 
@@ -59,9 +60,21 @@ variable "vps_ram_gb" {
 }
 
 variable "config_output_path" {
-  description = "Optional kubeconfig write path. Empty skips the access provisioner (Phase 1 validate)."
+  description = "Optional kubeconfig write path. Empty skips the access provisioner. BREAK-GLASS ONLY (iam-sso) — do not distribute to teammates; use OIDC/Headlamp."
   type        = string
   default     = ""
+}
+
+variable "oidc_issuer_url" {
+  description = "When non-empty, patch kube-apiserver for Keycloak OIDC (iam-sso Phase 3). Example: https://auth.asrax.in/realms/am-realm"
+  type        = string
+  default     = ""
+}
+
+variable "oidc_client_id" {
+  description = "OIDC client id for kubectl (default kubectl)."
+  type        = string
+  default     = "kubectl"
 }
 
 variable "enable_data_mount" {

@@ -10,7 +10,7 @@ param(
   [string]$Env,
 
   [Parameter(Mandatory = $true)]
-  [ValidateSet("infra", "apps", "platform", "obs", "vault-apps", "stores", "edge", "exposer", "warmup")]
+  [ValidateSet("infra", "apps", "platform", "obs", "vault-apps", "vault-apps-contabo", "stores", "edge", "exposer", "warmup")]
   [string]$Role
 )
 

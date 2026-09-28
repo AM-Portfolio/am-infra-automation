@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+data:
+  config.hcl: "vault {\n    \"address\" = \"http://vault-csi-provider.kube-system.svc:8200\"\
+    \n}\n\ncache {}\n\nlistener \"unix\" {\n    address = \"/var/run/vault/agent.sock\"\
+    \n    tls_disable = true\n}\n"
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: vault-csi-provider
+    meta.helm.sh/release-namespace: kube-system
+  labels:
+    app.kubernetes.io/instance: vault-csi-provider
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault-csi-provider
+    helm.sh/chart: vault-0.34.1
+  name: vault-csi-provider-csi-provider-agent-config
+  namespace: kube-system

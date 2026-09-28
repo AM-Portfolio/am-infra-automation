@@ -1,3 +1,5 @@
+# RETIRED for kind-fleet Contabo/preprod — see RETIRED.md.
+# Do not terraform apply: SoT Grafana is compose/obs on VPS2 (grafana.asrax.in).
 
 module "grafana" {
   source                 = "../modules/apps/grafana"

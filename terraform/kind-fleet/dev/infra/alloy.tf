@@ -25,6 +25,9 @@ module "alloy_logs" {
   namespace                    = "monitoring"
   cluster_name                = "am-dev-infra"
   environment                 = "dev"
+  vps                         = "vps-dev"
+  vps_name                    = "VPS_DEV"
+  vps_ip                      = "laptop"
   loki_push_url               = local.loki_push_url
   prometheus_remote_write_url = local.prometheus_remote_write_url
 }

@@ -1,0 +1,61 @@
+# AppProject for production Kind-fleet apps (am-prod-apps).
+# Apply: kubectl apply -f projects/am-prod.yaml
+#
+# Roles:
+#   read-only  — view Applications / ApplicationSets / logs; no exec.
+#   break-glass — on-call sync / override / resource actions when automated sync is insufficient.
+#                 Restrict group membership to pager / platform on-call only.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: am-prod
+  namespace: argocd
+spec:
+  description: Production apps on Kind am-prod-apps (fleet)
+  sourceRepos:
+    - https://github.com/AM-Portfolio/*
+  destinations:
+    # Roots / ApplicationSets live in argocd ns on platform
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+    # Platform UIs (n8n) on Argo's in-cluster Kind
+    - server: https://kubernetes.default.svc
+      namespace: n8n
+    # Product + agents on enrolled Kind cluster
+    - name: am-prod-apps
+      namespace: am-apps-prod
+    - name: am-prod-apps
+      namespace: am-agents-prod
+    - name: am-prod-apps
+      namespace: edge
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  # Warn (do not delete) when cluster has resources not in git
+  orphanedResources:
+    warn: true
+  roles:
+    - name: read-only
+      description: Read Applications / ApplicationSets / logs; exec denied
+      policies:
+        - p, proj:am-prod:read-only, applications, get, am-prod/*, allow
+        - p, proj:am-prod:read-only, applications, list, am-prod/*, allow
+        - p, proj:am-prod:read-only, applications, watch, am-prod/*, allow
+        - p, proj:am-prod:read-only, applicationsets, get, am-prod/*, allow
+        - p, proj:am-prod:read-only, applicationsets, list, am-prod/*, allow
+        - p, proj:am-prod:read-only, applicationsets, watch, am-prod/*, allow
+        - p, proj:am-prod:read-only, logs, get, am-prod/*, allow
+        - p, proj:am-prod:read-only, exec, create, am-prod/*, deny
+      groups: []
+    - name: break-glass
+      description: On-call sync/override/actions — use sparingly; Prefer Promote PRs for image rolls
+      policies:
+        - p, proj:am-prod:break-glass, applications, get, am-prod/*, allow
+        - p, proj:am-prod:break-glass, applications, sync, am-prod/*, allow
+        - p, proj:am-prod:break-glass, applications, override, am-prod/*, allow
+        - p, proj:am-prod:break-glass, applications, action/*, am-prod/*, allow
+        - p, proj:am-prod:break-glass, logs, get, am-prod/*, allow
+      groups: []

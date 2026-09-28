@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+data:
+  key: 8SdlR0awmTzqBc14cX+9NKSngt8XC/tDYApmA5DlBCE=
+immutable: true
+kind: Secret
+metadata:
+  name: vault-csi-provider-hmac-key
+  namespace: kube-system
+type: Opaque

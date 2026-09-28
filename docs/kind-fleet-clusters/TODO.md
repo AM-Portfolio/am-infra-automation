@@ -2,7 +2,11 @@
 
 **Agent playbook:** skill **`am-kind-fleet`** in `amctl/ai-catalog/skills/platform/am-kind-fleet/` (install with `am ai sync` / `am ai install` when ready — review skill first). Checkboxes here remain SoT for multi-env / laptop history.
 
-**Prod track SoT:** [`PROD_DEPLOY.md`](PROD_DEPLOY.md) + [`prod/`](prod/) (VPS1 phase-wise Implement + Test — all unchecked until executed).
+**Prod track SoT:** [`PROD_DEPLOY.md`](PROD_DEPLOY.md) + [`prod/`](prod/) (VPS1 phase-wise Implement + Test).
+
+**Identity / infra split track:** [`identity-infra-split/`](identity-infra-split/) — Contabo **2** Kind + **1** DB stack; DR **1** Kind (R2 slave DBs+platform, same-domain services cutover); nonprod **1** Kind + preprod backup gate; **Terraform-first** (no surgery-script SoT). Does not replace `prod/`.
+
+**DR track SoT:** [`DR_DEPLOY.md`](DR_DEPLOY.md) + [`dr/`](dr/) (VPS3 — Phase **4 Vault** then Phase **5 Argo**; G20/LB in `dr/phase-6-g20-lb.md`).
 
 Pack: `docs/kind-fleet-clusters/`. Resume from the first unchecked **Test** item (for **prod**, open `prod/` first).
 
@@ -36,7 +40,7 @@ Pack: `docs/kind-fleet-clusters/`. Resume from the first unchecked **Test** item
 | 8 | [Phase 5](#phase-5--vps-connect--security-before-any-vps-kind) | VPS security |
 | 9 | [Phase ZT](#phase-zt--zero-trust--identity-admin) | Zero-trust + Identity Admin (pointers) |
 | 10 | [Phase 6–9](#phase-6--dr--replica-users-still-on-vps1) | DR / failback |
-| 11 | [Phase 10](#phase-10--sso-prove) | SSO prove (ZT-P1 enforce sync) |
+| 11 | [Phase 10](#phase-10--sso-prove) | SSO prove → pack [`iam-sso/`](iam-sso/) |
 | 12 | [Phase 11](#phase-11--vps2-obs--grafana-parallel) | VPS2 obs (Alloy Access token) |
 | 13 | [Phase 12](#phase-12--scheduled-failover-drill) | Failover drill |
 
@@ -53,7 +57,7 @@ Detail: [`../ZERO_TRUST_ACCESS.md`](../ZERO_TRUST_ACCESS.md) · [`am-platform/do
 | ---- | --- | ------------------------------------------------------------ | -------- | -------- |
 | Laptop | `dev` lab (optional) | Docker on this machine | `am-dev-*` (product); platform prefers VPS2 | `~/.asrax/tfstate/dev/` |
 | VPS1 Contabo | `prod` | `VPS_IP` | `am-prod-infra` / `apps` / `platform` (2-node) | `/data/am-state/terraform/prod/` |
-| VPS2 | **ops / shared platform** | `VPS_2_IP` | `am-obs` + platform tools; Vault **`apps/data/dev` SoT** | `/data/am-state/terraform/obs/` (+ platform) |
+| VPS2 | **ops / shared obs** (11b later) | `VPS_2_IP` | Docker Compose obs hub (no Kind); 11b Vault **`apps/data/dev` SoT** later | `/data/am-state/obs/` (+ platform later) |
 | VPS3 | `dr` | `VPS_3_IP` | `am-dr-infra` / `apps` / `platform` (1-node) | `/data/am-state/terraform/dr/` |
 
 **Connection file:** [VPS/.env](../../../VPS/.env) (gitignored). Use `VPS_IP` / `VPS_2_IP` / `VPS_3_IP` and kube name `VPS_KUBECONFIG`. **Never** copy `VPS_*_PASSWORD`, `VAULT_TOKEN`, or unseal keys into this pack or git. Legacy `VAULT_ADDR=http://localhost:8201` in that file is **not** the new cluster addr (G26).
@@ -67,7 +71,7 @@ Formula: `cluster_role == "obs" ? "am-obs" : "am-${env}-${cluster_role}"`. Env =
 | Development (lab) | laptop (optional) | `am-dev-infra` / `apps` / `platform` | `am-apps-dev` | `am-agents-dev` | **SoT → VPS2** `apps/data/dev/` | `dev` | `~/.asrax/kubeconfig.am-dev-<role>.yaml` |
 | Production | VPS1 | `am-prod-infra` / `am-prod-apps` / `am-prod-platform` | `am-apps-prod` | `am-agents-prod` | `apps/data/prod/` | `prod` | `/data/am-state/kubeconfig.am-prod-<role>.yaml` · `kind-am-prod-<role>` |
 | Disaster recovery | VPS3 | `am-dr-infra` / `am-dr-apps` / `am-dr-platform` | `am-apps-dr` | `am-agents-dr` | `apps/data/dr/` | `dr` | `/data/am-state/kubeconfig.am-dr-<role>.yaml` · `kind-am-dr-<role>` |
-| Ops + platform hub | VPS2 | `am-obs` (+ platform) | — (no product apps) | — | **`apps/data/dev/` SoT** + obs | `obs` | `/data/am-state/kubeconfig.am-obs.yaml` · `kind-am-obs` |
+| Ops + obs hub | VPS2 | **Docker Compose** (no Kind); 11b platform later | — (no product apps) | — | obs now; **`apps/data/dev/` SoT** in 11b | `obs` | n/a (Compose) · data `/data/am-state/obs/` |
 
 **VPS2 hub detail:** [VPS2_DEV_PLATFORM.md](VPS2_DEV_PLATFORM.md) — DBs + Grafana/OpenProject/Lago/Langfuse/… credentials.
 
@@ -970,21 +974,20 @@ Resume flags: `-SkipBackup -SkipWipe -SkipTerraform -SkipPin` / `-StartFromWave 
 
 ## Phase 6 — DR + replica (users still on VPS1)
 
+**Checkbox SoT:** [`DR_DEPLOY.md`](DR_DEPLOY.md) + [`dr/`](dr/) — Phase **4 = Vault sync only**, Phase **5 = Argo deploy/sync/verify**, then [`dr/phase-6-g20-lb.md`](dr/phase-6-g20-lb.md).
+
 ### Implement
 
 - [x] Prereq: Phase 5.3 WG green; VPS3 ≥ 32 GB; VPS1 still serving
 - [x] G1: `kind create` `am-dr-infra` :6443 *(2026-09-24 break-glass; kubeconfig `/data/am-state/kubeconfig.am-dr-infra.yaml`)*
 - [x] G1: `kind create` `am-dr-apps` :6444
 - [x] G1: `kind create` `am-dr-platform` :6445
-- [ ] Repeat **Phase 2 Implement** on DR — **Edge first** (Traefik + `asrax-dr-tunnel` + CNAME), then TCP A + **exposer (Docker DNS `am-dr-infra-control-plane`)**, then stores (`enable_watcher=true` + seed `vault-unseal-keys`), then IngressRoutes. Do not skip Edge; do not bake Kind IP; do not ship `enable_watcher=false` *(partial 2026-09-24: Edge Traefik+cloudflared+CNAMEs + `asrax-dr-tunnel` healthy + exposer `am-port-exposer` up; **stores still sizing stub**)*
-- [ ] Seed DR/VPS1 from `asrax-db-backups` **as soon as DBs exist** (before AM apps)
-- [ ] Repeat **Phase 3 Implement** on DR (Keycloak, all OIDC clients, Argo, Temporal)
-- [ ] Repeat **Phase 4 Implement (4a–4g)** on DR: Vault keys → `apps/data/dr/…` (rewrite to `*-dr.asrax.in`) + G25 SA/CSI + am-gitops `dr/` waves through Postman MCP closout (or DR-equivalent API verify)
-- [ ] G20: Postgres **standby** on VPS3 from VPS1 primary over WireGuard
-- [ ] G20: Mongo **secondary** on VPS3 from VPS1 primary over WireGuard
-- [ ] **No** R2 restore cron onto PG/Mongo
-- [ ] Cloudflare MCP: `am-dr.asrax.in`, `auth-dr.asrax.in`, all G24 `*-dr.asrax.in`
-- [ ] Cloudflare LB: VPS1 primary / VPS3 fallback on `am` + `auth`; health `/health`; **auto-failback off**
+- [ ] Repeat **Phase 2** on DR — see [`dr/phase-2.md`](dr/phase-2.md) *(partial 2026-09-24: Edge+exposer; **stores still sizing stub**)*
+- [ ] Seed DR from R2 as soon as DBs exist — [`dr/phase-2.md`](dr/phase-2.md) 2G
+- [ ] Repeat **Phase 3** on DR — [`dr/phase-3.md`](dr/phase-3.md)
+- [ ] **Phase 4 Vault only** — [`dr/phase-4.md`](dr/phase-4.md): `apps/data/dr/…` + G25 (no product pods)
+- [ ] **Phase 5 Argo** — [`dr/phase-5-argo.md`](dr/phase-5-argo.md): register + waves 5c–5g + verify
+- [ ] G20 + CF LB — [`dr/phase-6-g20-lb.md`](dr/phase-6-g20-lb.md)
 - [ ] Isolation: **no** `am-apps-prod` on VPS3
 
 ### Test (this phase)
@@ -1118,18 +1121,24 @@ Pointers only — detail in [`../ZERO_TRUST_ACCESS.md`](../ZERO_TRUST_ACCESS.md)
 
 ## Phase 10 — SSO prove
 
-**See also: [Phase ZT](#phase-zt--zero-trust--identity-admin)** (ZT-P1 MFA + Access enforce; tick these tests after ZT-P1).
+**Checkbox SoT:** [`iam-sso/`](iam-sso/) — resume from the first unchecked **Test** there (Implement → Test → Grown).  
+Console coverage: [`iam-sso/CONSOLE_MATRIX.md`](iam-sso/CONSOLE_MATRIX.md) (Keycloak, Argo, Vault, kube/Headlamp+kubectl, Lago, Langfuse, Temporal, LiteLLM, full G24).
+
+**See also: [Phase ZT](#phase-zt--zero-trust--identity-admin)** (ZT-P1 MFA + Access enforce; tick after ZT-P1).
 
 ### Implement
 
-- [ ] Drop Authentik everywhere on new clusters
-- [ ] Point Grafana OIDC → `https://auth.asrax.in/realms/am-realm`
-- [ ] Point MinIO / Argo / Headlamp / remaining G24 → same realm
-- [ ] Disable human Grafana password (break-glass password only in Vault)
+- [x] Drop Authentik everywhere on new clusters (fleet Keycloak-only path; no Authentik for iam-sso consoles)
+- [x] Complete [`iam-sso/`](iam-sso/) Phases 1–4 **Implement** (Keycloak TTL/mappers → consoles → kubectl OIDC → prove/rotate docs). **Test** checkboxes remain operator-run after apply
+- [x] Point Grafana OIDC → `https://auth.asrax.in/realms/am-realm`
+- [x] Point MinIO / Argo / Headlamp / Lago / Langfuse / Temporal / LiteLLM / remaining G24 → same realm (code wired; apply + secrets)
+- [x] Disable human Grafana password in compose example (`GF_AUTH_DISABLE_LOGIN_FORM=true`; break-glass admin in Vault)
+- [x] Stop distributing shared kubeconfigs for teammate onboarding (break-glass only — `access.tf` / `gen-kubeconfig.sh` banners)
 
 ### Test (this phase)
 
-- [ ] `am-admin` opens **every** G24 console by domain (modern-ui, gateway, MinIO, Grafana, Keycloak, Argo, Headlamp, Kafka UI, pgAdmin, Mongo, Redis, Vault, Influx, Temporal, Traefik)
+- [ ] Resume [`iam-sso/tests/`](iam-sso/tests/) — all phase tests green
+- [ ] `am-admin` opens **every** CONSOLE_MATRIX major by domain
 - [ ] `am-user` denied Grafana / MinIO / infra consoles
 - [ ] No Authentik issuer; no localhost redirect
 
@@ -1137,33 +1146,39 @@ Pointers only — detail in [`../ZERO_TRUST_ACCESS.md`](../ZERO_TRUST_ACCESS.md)
 
 - [ ] Phase 4/6 AM apps (market quotes + identity token path) still live
 - [ ] G26 grep still clean
+- [ ] Day-to-day access does not require emailed kubeconfig
 
 ---
 
 ## Phase 11 — VPS2 obs / Grafana (parallel)
 
+**Checkbox SoT:** [OBS_DEPLOY.md](OBS_DEPLOY.md) · [`obs/`](obs/) (prefer marking boxes there).  
 **See also: [Phase ZT](#phase-zt--zero-trust--identity-admin)** (ZT-EDGE Alloy Service Token hard-coupled with Loki/Prom Access).
 
-**Sizing / retention / FQDNs:** [OBS_VPS2_SIZING.md](OBS_VPS2_SIZING.md).  
-**Ops/dev hub + credentials:** [VPS2_DEV_PLATFORM.md](VPS2_DEV_PLATFORM.md) — prefer **≥16 GB** if platform apps colocated.
+**Sizing / retention / FQDNs:** [OBS_VPS2_SIZING.md](OBS_VPS2_SIZING.md) · [obs/SIZING.md](obs/SIZING.md).  
+**Compose:** [`compose/obs/`](../../compose/obs/) — **Docker only, no Kind, no external DB**.  
+**Ops/dev hub + credentials (11b later):** [VPS2_DEV_PLATFORM.md](VPS2_DEV_PLATFORM.md) — needs **≥16 GB**; refuse on 8 GB obs box.
 
 ### Implement (11 — obs)
 
-- [ ] Prereq: Phase 5.2; Phase 0. Prefer **before Phase 7** if VPS2 exists (G9)
-- [ ] Kind `am-obs` API :6443 on **VPS2**
-- [ ] Install **Grafana** (resources/PVC per [OBS_VPS2_SIZING.md](OBS_VPS2_SIZING.md))
-- [ ] Install **Prometheus** — retention **30d**, PVC ~40 Gi
-- [ ] Install **Loki** — retention **14d**, caches off, PVC ~80 Gi
-- [ ] Install **Tempo** — retention **5d**, PVC ~50 Gi
-- [ ] **CronJob log-janitor** every 6h: if Loki PVC ≥ 80% (or always), clean logs older than retention
-- [ ] Alloy on other hosts → VPS2 HTTPS push to bare FQDNs (`loki` / `prometheus` / `tempo`.asrax.in)
-- [ ] State `/data/am-state/terraform/obs`
-- [ ] **No** product `am-apps-*`, **no** kagent on VPS2
-- [ ] Cloudflare MCP (**after** Test health), tunnel → VPS2 Traefik/edge:
-  - [ ] `grafana.asrax.in`
-  - [ ] `loki.asrax.in`
-  - [ ] `prometheus.asrax.in`
-  - [ ] `tempo.asrax.in`
+- [x] Prereq: Phase 5.2; Phase 0. Prefer **before Phase 7** if VPS2 exists (G9)
+- [x] **Docker Compose** hub on VPS2 (`compose/obs`) — **no** Kind `am-obs`
+- [x] Data dirs `/data/am-state/obs/{loki,prometheus,tempo,grafana}/` (filesystem + Grafana SQLite)
+- [x] Install **Grafana** (SQLite; mem ≤1 Gi) per [OBS_VPS2_SIZING.md](OBS_VPS2_SIZING.md)
+- [x] Install **Prometheus** — retention **30d**, volume **30–35 Gi**
+- [x] Install **Loki** — retention **14d**, caches off, volume **60–70 Gi**
+- [x] Install **Tempo** — retention **5d**, volume **30–40 Gi**
+- [x] **log-janitor** every 6h: if Loki volume ≥ 80% (or always), clean logs older than retention
+- [x] Alloy on other hosts → VPS2 HTTPS push to bare FQDNs (`loki` / `prometheus` / `tempo`.asrax.in) — **obs Phase 6** ([obs/phase-6-fleet.md](obs/phase-6-fleet.md))
+- [x] Traefik + cloudflared; backends **not** published on public NIC
+- [x] **No** product `am-apps-*`, **no** kagent, **no** Kind on VPS2
+- [x] Cloudflare MCP (**after** Test health + **user confirm**), tunnel → VPS2 Traefik:
+  - [x] `grafana.asrax.in`
+  - [x] `loki.asrax.in`
+  - [x] `prometheus.asrax.in`
+  - [x] `tempo.asrax.in`
+- [x] Retire laptop `kind-fleet/dev/obs` interim ([obs/phase-4.md](obs/phase-4.md))
+- [x] Fleet ingest + dashboards (UIDs, `platform_ctl` republish, Alloy prod/dr/preprod/dev, obs self-telemetry, prod LOKI overlay) — **obs Phase 6** ([obs/phase-6-fleet.md](obs/phase-6-fleet.md))
 
 ### Implement (11b — platform + credentials hub)
 

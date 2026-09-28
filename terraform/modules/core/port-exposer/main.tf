@@ -12,7 +12,7 @@ locals {
   # Build a single robust shell command to start multiple socat relays in parallel
   socat_cmd = join(" & ", [
     for m in var.mappings :
-    "echo '🔌 Forwarding ${m.name}: Host ${m.host_port} -> Cluster ${m.target_host}:${m.target_port}'; socat -d -d TCP-LISTEN:${m.host_port},fork,reuseaddr TCP:${m.target_host}:${m.target_port}"
+    "echo 'ðŸ”Œ Forwarding ${m.name}: Host ${m.host_port} -> Cluster ${m.target_host}:${m.target_port}'; socat -d -d TCP-LISTEN:${m.host_port},fork,reuseaddr TCP:${m.target_host}:${m.target_port}"
   ])
 }
 
@@ -25,7 +25,7 @@ resource "null_resource" "exposer_bridge" {
   }
 
   provisioner "local-exec" {
-    interpreter = ["/bin/bash", "-c"]
+    interpreter = ["bash", "-c"]
     command     = <<EOT
       docker rm -f ${var.container_name} 2>/dev/null || true
       docker run -d --name ${var.container_name} \
@@ -33,16 +33,16 @@ resource "null_resource" "exposer_bridge" {
         --network kind \
         --restart always \
         alpine/socat \
-        -c "echo '🌐 AM Bridge Online...'; ${local.socat_cmd} & wait"
+        -c "echo 'ðŸŒ AM Bridge Online...'; ${local.socat_cmd} & wait"
       
-      echo "⏳ Waiting for bridge stability (5s)..."
+      echo "â³ Waiting for bridge stability (5s)..."
       sleep 5
       
       status=$(docker inspect -f '{{.State.Running}}' ${var.container_name})
       if [ "$status" = "true" ]; then
-        echo "✅ Bridge is UP and stable."
+        echo "âœ… Bridge is UP and stable."
       else
-        echo "❌ Bridge failed to stay UP. Check logs with 'docker logs ${var.container_name}'"
+        echo "âŒ Bridge failed to stay UP. Check logs with 'docker logs ${var.container_name}'"
         exit 1
       fi
     EOT

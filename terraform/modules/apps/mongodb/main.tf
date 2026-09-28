@@ -61,6 +61,10 @@ resource "helm_release" "mongodb" {
       rootPassword  = var.mongo_root_password
     }
     architecture = "standalone"
+    # Avoid RollingUpdate + RWO PVC lock (two pods fighting DBPathInUse)
+    updateStrategy = {
+      type = "Recreate"
+    }
     strategyType = "Recreate"
     nodeSelector = {
       role = "infra"
@@ -84,6 +88,13 @@ resource "helm_release" "mongodb" {
         memory = var.memory_limit
       }
     }
+    metrics = {
+      enabled        = true
+      compatibleMode = true
+      image = {
+        repository = "bitnamilegacy/mongodb-exporter"
+      }
+    }
     extraFlags = [
       "--wiredTigerCacheSizeGB=${var.wired_tiger_cache_gb}"
     ]
@@ -96,9 +107,14 @@ resource "helm_release" "mongodb" {
       }
     }
 
-    # 🌐 External Access: Expose MongoDB via NodePort for port-exposer
+    # 🌐 External Access: Expose MongoDB via NodePort for port-exposer.
+    # externalTrafficPolicy MUST be Cluster: mongo often schedules on the
+    # control-plane while am-port-exposer socats to infra-worker:30017. Local
+    # policy blackholes that path (TCP accept, Mongo wire timeout) for laptop
+    # Kind dig / public mongo.asrax.in clients.
     service = {
-      type = "NodePort"
+      type                  = "NodePort"
+      externalTrafficPolicy = "Cluster"
       nodePorts = {
         mongodb = 30017
       }
@@ -107,6 +123,28 @@ resource "helm_release" "mongodb" {
     # ENTERPRISE PREVENTION LOCK: Do NOT delete the MongoDB cluster accidentally
     annotations = {
       "helm.sh/resource-policy" = "keep"
+    }
+
+    # Alloy scrapes prometheus.io/* on pod metadata (not Service annotations)
+    podAnnotations = {
+      "prometheus.io/scrape" = "true"
+      "prometheus.io/port"   = "9216"
+      "prometheus.io/path"   = "/metrics"
+    }
+
+    # Percona mongodb_exporter sidecar → Alloy annotated scrape → hub Prometheus
+    metrics = {
+      enabled        = true
+      compatibleMode = true
+      image = {
+        registry   = "docker.io"
+        repository = "bitnamilegacy/mongodb-exporter"
+      }
+      collector = {
+        diagnosticdata   = true
+        replicasetstatus = true
+        dbstats          = true
+      }
     }
   })]
 

@@ -32,6 +32,17 @@ variable "cloudflare_account_id" {
   default   = ""
 }
 
+variable "kubeapi_kind_api_origin" {
+  description = "Additive tunnel origin for kubeapi-dr.asrax.in (Kind am-dr-apps API). Empty = omit."
+  type        = string
+  default     = "https://127.0.0.1:6443"
+}
+
+variable "enable_kubeapi_ingress" {
+  type    = bool
+  default = true
+}
+
 provider "kubernetes" {
   config_path    = "/data/am-state/kubeconfig.am-dr-infra.yaml"
   config_context = "kind-am-dr-infra"
@@ -89,6 +100,36 @@ module "edge" {
     "asrax",
   ]
   bare_https_names = []
+  # Bare prod FQDNs on tunnel only — DNS owned by prod/cloudflare-lb (DR primary / Contabo fallback).
+  tunnel_only_fqdns = [
+    "vault.asrax.in",
+    "minio.asrax.in",
+    "s3.asrax.in",
+    "influx.asrax.in",
+    "traefik.asrax.in",
+    "pgadmin.asrax.in",
+    "mongo-express.asrax.in",
+    "kafka-ui.asrax.in",
+    "redis-ui.asrax.in",
+    "auth.asrax.in",
+    "argocd.asrax.in",
+    "temporal.asrax.in",
+    "lago.asrax.in",
+    "n8n.asrax.in",
+    "growthbook.asrax.in",
+    "openproject.asrax.in",
+    "litellm.asrax.in",
+    "langfuse.asrax.in",
+    "novu.asrax.in",
+    "am.asrax.in",
+    "corp.asrax.in",
+    "asrax.asrax.in",
+    "asrax.in",
+  ]
+  # Additive Kind API hostname (DNS owned by kind-fleet/dr/argo-kubeapi).
+  extra_origin_ingress = var.enable_kubeapi_ingress && var.kubeapi_kind_api_origin != "" ? {
+    "kubeapi-dr.asrax.in" = var.kubeapi_kind_api_origin
+  } : {}
 }
 
 output "traefik_origin" { value = module.edge.traefik_origin }

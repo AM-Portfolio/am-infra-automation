@@ -8,15 +8,22 @@ resource "kubernetes_service_v1" "nodeport" {
   }
   spec {
     type = "NodePort"
-    selector = {
+    # OIDC: selector must match oauth2-proxy pods; otherwise lago-front.
+    selector = var.oidc_proxy_service != "" ? {
+      "app.kubernetes.io/name"     = "oauth2-proxy"
+      "app.kubernetes.io/instance" = var.oidc_proxy_service
+    } : {
       "io.lago.service" = "lago-front"
     }
     port {
       name        = "http"
       port        = 80
-      target_port = 80
+      target_port = var.oidc_proxy_service != "" ? var.oidc_proxy_port : 80
       node_port   = var.node_port
     }
+  }
+  lifecycle {
+    ignore_changes = []
   }
 }
 
@@ -34,8 +41,8 @@ resource "kubectl_manifest" "ingressroute" {
         - match: Host(`${local.ui_host}`)
           kind: Rule
           services:
-            - name: lago-front-svc
-              port: 80
+            - name: ${var.oidc_proxy_service != "" ? var.oidc_proxy_service : "lago-front-svc"}
+              port: ${var.oidc_proxy_service != "" ? var.oidc_proxy_port : 80}
           middlewares:
             - name: force-https-proto
               namespace: ${var.gateway_middleware_namespace}

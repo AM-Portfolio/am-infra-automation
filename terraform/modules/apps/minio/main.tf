@@ -75,6 +75,11 @@ resource "kubernetes_stateful_set" "minio" {
     template {
       metadata {
         labels = { app = "minio" }
+        annotations = {
+          "prometheus.io/scrape" = "true"
+          "prometheus.io/port"   = "9000"
+          "prometheus.io/path"   = "/minio/v2/metrics/cluster"
+        }
       }
       spec {
         container {
@@ -95,20 +100,26 @@ resource "kubernetes_stateful_set" "minio" {
             secret_ref { name = kubernetes_secret.minio_secret.metadata[0].name }
           }
 
-          # OIDC Integration logic
+          env {
+            name  = "MINIO_PROMETHEUS_AUTH_TYPE"
+            value = "public"
+          }
+
           env {
             name  = "MINIO_BROWSER_REDIRECT_URL"
-            value = "https://minio${var.environment == "local" ? "-local" : ""}.${var.root_domain}"
+            value = local.minio_console_url
           }
-          
-          # 5. OIDC Integration (Dynamic)
+
+          # Keycloak OpenID (native MinIO console button)
           dynamic "env" {
-            for_each = local.final_oidc_client_id != "" ? [
-              { name = "MINIO_IDENTITY_OPENID_DISPLAY_NAME",  value = "Authentik SSO" },
-              { name = "MINIO_IDENTITY_OPENID_CONFIG_URL",    value = "${local.final_oidc_issuer_url}/application/o/minio/.well-known/openid-configuration" },
-              { name = "MINIO_IDENTITY_OPENID_CLIENT_ID",     value = local.final_oidc_client_id },
+            for_each = local.minio_oidc_ready ? [
+              { name = "MINIO_IDENTITY_OPENID_DISPLAY_NAME", value = local.oidc_display_name },
+              { name = "MINIO_IDENTITY_OPENID_CONFIG_URL", value = local.oidc_config_url },
+              { name = "MINIO_IDENTITY_OPENID_CLIENT_ID", value = local.final_oidc_client_id },
               { name = "MINIO_IDENTITY_OPENID_CLIENT_SECRET", value = local.final_oidc_client_secret },
-              { name = "MINIO_IDENTITY_OPENID_SCOPES",        value = "openid,profile,email" }
+              { name = "MINIO_IDENTITY_OPENID_SCOPES", value = "openid,profile,email,roles,groups" },
+              { name = "MINIO_IDENTITY_OPENID_REDIRECT_URI", value = "${local.minio_console_url}/oauth_callback" },
+              { name = "MINIO_IDENTITY_OPENID_CLAIM_NAME", value = "groups" },
             ] : []
             content {
               name  = env.value.name
@@ -168,18 +179,28 @@ resource "kubernetes_service" "minio" {
   }
 }
 
-# 5. OIDC Configuration Fetch (from Vault)
-# This allows zero-touch SSO integration after the 'access' layer has run.
+# Optional KV fallback only when client secret is not passed at apply time.
 data "vault_kv_secret_v2" "oidc" {
-  count = var.oidc_enabled ? 1 : 0
-  mount = "secret"
-  name  = "${var.environment}/infra/oidc-minio"
+  count = var.oidc_enabled && var.oidc_client_secret == "" ? 1 : 0
+  mount = "apps"
+  name  = "${var.environment}/oidc/minio"
 }
 
 locals {
-  # Safe extraction with defaults to prevent plan errors
-  oidc_data = var.oidc_enabled ? data.vault_kv_secret_v2.oidc[0].data : {}
-  final_oidc_client_id     = var.oidc_client_id     != "" ? var.oidc_client_id     : lookup(local.oidc_data, "client_id", "")
+  oidc_data                = length(data.vault_kv_secret_v2.oidc) > 0 ? data.vault_kv_secret_v2.oidc[0].data : {}
+  final_oidc_client_id     = var.oidc_client_id != "" ? var.oidc_client_id : lookup(local.oidc_data, "client_id", "minio")
   final_oidc_client_secret = var.oidc_client_secret != "" ? var.oidc_client_secret : lookup(local.oidc_data, "client_secret", "")
-  final_oidc_issuer_url    = var.oidc_issuer_url    != "" ? var.oidc_issuer_url    : lookup(local.oidc_data, "issuer_url", "")
+  final_oidc_issuer_url    = var.oidc_issuer_url != "" ? var.oidc_issuer_url : lookup(local.oidc_data, "issuer_url", "")
+  minio_oidc_ready         = var.oidc_enabled && local.final_oidc_client_id != "" && local.final_oidc_client_secret != "" && local.final_oidc_issuer_url != ""
+  oidc_is_keycloak         = can(regex("/realms/", local.final_oidc_issuer_url))
+  oidc_display_name        = local.oidc_is_keycloak ? "Keycloak" : "Authentik SSO"
+  oidc_config_url = local.oidc_is_keycloak ? (
+    "${trimsuffix(local.final_oidc_issuer_url, "/")}/.well-known/openid-configuration"
+    ) : (
+    "${trimsuffix(local.final_oidc_issuer_url, "/")}/application/o/minio/.well-known/openid-configuration"
+  )
+  minio_host = var.environment == "prod" || var.environment == "local" ? (
+    var.environment == "local" ? "minio-local.${var.root_domain}" : "minio.${var.root_domain}"
+  ) : "minio-${var.environment}.${var.root_domain}"
+  minio_console_url = "https://${local.minio_host}"
 }

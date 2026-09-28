@@ -1,7 +1,8 @@
-# Fleet Kind entrypoint. Do not apply terraform/foundation/{local,preprod}.
-# Computed Kind name: am-obs
-# Host state (terraform init -backend-config=backend.hcl): /data/am-state/terraform/obs/terraform.tfstate
-# Phase 1: validate only. Do not terraform apply or kind create.
+# OBSOLETE for Phase 11 SoT — VPS2 obs is Docker Compose (no Kind).
+# See: compose/obs/ + docs/kind-fleet-clusters/OBS_DEPLOY.md
+# Do not terraform apply or kind create on VPS2 for the shared Grafana/Loki hub.
+# Fleet Kind entrypoint stub only (am-obs name). Do not apply terraform/foundation/{local,preprod}.
+# Host state path (unused for Compose hub): /data/am-state/terraform/obs/terraform.tfstate
 
 module "cluster" {
   source       = "../../modules/core/cluster"

@@ -1,0 +1,28 @@
+# Static config — Traefik v3 (tunnel origin only)
+apiVersion: 1
+
+entryPoints:
+  web:
+    address: ":80"
+  metrics:
+    address: ":8080"
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+log:
+  level: INFO
+
+accessLog: {}
+
+api:
+  dashboard: false
+  insecure: false
+
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true

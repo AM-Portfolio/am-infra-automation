@@ -233,6 +233,46 @@ locals {
   }
 }
 
+# kafka_exporter — topic / consumergroup metrics for Platform / Kafka
+resource "kubernetes_deployment" "kafka_exporter" {
+  metadata {
+    name      = "kafka-exporter"
+    namespace = var.namespace
+    labels    = { app = "kafka-exporter" }
+  }
+  spec {
+    replicas = 1
+    selector { match_labels = { app = "kafka-exporter" } }
+    template {
+      metadata {
+        labels = { app = "kafka-exporter" }
+        annotations = {
+          "prometheus.io/scrape" = "true"
+          "prometheus.io/port"   = "9308"
+          "prometheus.io/path"   = "/metrics"
+        }
+      }
+      spec {
+        node_selector = { role = "infra" }
+        container {
+          name  = "kafka-exporter"
+          image = "danielqsj/kafka-exporter:v1.7.0"
+          args = [
+            "--kafka.server=kafka.${var.namespace}.svc.cluster.local:9092",
+            "--web.listen-address=:9308",
+          ]
+          port { container_port = 9308 }
+          resources {
+            requests = { memory = "32Mi", cpu = "10m" }
+            limits   = { memory = "128Mi", cpu = "200m" }
+          }
+        }
+      }
+    }
+  }
+  depends_on = [kubernetes_stateful_set.kafka]
+}
+
 # Kafka UI Installation
 resource "helm_release" "kafka_ui" {
   name       = "kafka-ui"

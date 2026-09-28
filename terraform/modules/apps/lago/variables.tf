@@ -59,9 +59,15 @@ variable "enable_gateway" {
   default = true
 }
 
-variable "oidc_enabled" {
-  type    = bool
-  default = false
+variable "oidc_proxy_service" {
+  type        = string
+  default     = ""
+  description = "When set, Traefik + NodePort front lago via this oauth2-proxy Service instead of lago-front."
+}
+
+variable "oidc_proxy_port" {
+  type    = number
+  default = 80
 }
 
 variable "node_port" {

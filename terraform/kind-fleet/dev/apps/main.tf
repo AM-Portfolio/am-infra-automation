@@ -28,7 +28,12 @@ module "cluster" {
   env             = local.env
   cluster_role    = "apps"
   api_server_port = 6444
-  node_shape      = "one"
+  # CP + apps worker + agents worker (preprod-style NS pinning via workload= label).
+  # Applying this against an existing one-node Kind replaces the cluster — prefer
+  # scripts/tmp-dev-apps-split-workers.ps1 to join workers in place first.
+  node_shape      = "split"
+  oidc_issuer_url = "https://auth-dev.asrax.in/realms/am-realm"
+  oidc_client_id  = "kubectl"
 }
 
 resource "local_file" "kubeconfig" {
@@ -45,6 +50,7 @@ resource "kubernetes_namespace" "am_apps" {
       environment = local.env
       managed-by  = "terraform"
       role        = "apps"
+      workload    = "apps"
     }
   }
 
@@ -58,6 +64,36 @@ resource "kubernetes_namespace" "am_agents" {
       environment = local.env
       managed-by  = "terraform"
       role        = "agents"
+      workload    = "agents"
+    }
+  }
+
+  depends_on = [module.cluster, local_file.kubeconfig]
+}
+
+# Preprod-style namespaces on the same laptop apps Kind (gitops: am-apps-preprod / am-agents-preprod).
+resource "kubernetes_namespace" "am_apps_preprod" {
+  metadata {
+    name = "am-apps-preprod"
+    labels = {
+      environment = "preprod"
+      managed-by  = "terraform"
+      role        = "apps"
+      workload    = "apps"
+    }
+  }
+
+  depends_on = [module.cluster, local_file.kubeconfig]
+}
+
+resource "kubernetes_namespace" "am_agents_preprod" {
+  metadata {
+    name = "am-agents-preprod"
+    labels = {
+      environment = "preprod"
+      managed-by  = "terraform"
+      role        = "agents"
+      workload    = "agents"
     }
   }
 
@@ -99,6 +135,34 @@ resource "kubernetes_service_account" "am_backend_sa_agents" {
   image_pull_secret { name = "ghcr-creds" }
 
   depends_on = [kubernetes_namespace.am_agents, module.vault_csi_auth]
+}
+
+resource "kubernetes_service_account" "am_backend_sa_apps_preprod" {
+  metadata {
+    name      = "am-backend-sa"
+    namespace = kubernetes_namespace.am_apps_preprod.metadata[0].name
+  }
+  automount_service_account_token = true
+
+  image_pull_secret { name = "github-registry-secret" }
+  image_pull_secret { name = "regcred" }
+  image_pull_secret { name = "ghcr-creds" }
+
+  depends_on = [kubernetes_namespace.am_apps_preprod, module.vault_csi_auth]
+}
+
+resource "kubernetes_service_account" "am_backend_sa_agents_preprod" {
+  metadata {
+    name      = "am-backend-sa"
+    namespace = kubernetes_namespace.am_agents_preprod.metadata[0].name
+  }
+  automount_service_account_token = true
+
+  image_pull_secret { name = "github-registry-secret" }
+  image_pull_secret { name = "regcred" }
+  image_pull_secret { name = "ghcr-creds" }
+
+  depends_on = [kubernetes_namespace.am_agents_preprod, module.vault_csi_auth]
 }
 
 output "cluster_name" {

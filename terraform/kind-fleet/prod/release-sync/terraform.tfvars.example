@@ -1,0 +1,7 @@
+prometheus_url     = "https://prometheus.asrax.in"
+env_regex          = "prod"
+# service_regex    = "am-gateway|am-identity"
+dry_run            = true
+enable_mutations   = false
+# sync_order_path  = "F:/am-repos/am-repos/am-gitops/catalog/sync-order.yaml"
+# am_bin           = "am"

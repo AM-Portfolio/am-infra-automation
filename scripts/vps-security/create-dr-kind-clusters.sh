@@ -8,6 +8,8 @@ G1=/usr/local/sbin/break-glass-kind.sh
 STATE=/data/am-state
 CFG_DIR=/data/am-state/kind-configs
 VPS_IP="${VPS_IP:-129.121.128.131}"
+# Bind 0.0.0.0 so laptop ~/.asrax kubeconfigs can use https://$VPS_IP:644x (prod pattern).
+API_ADDR="${API_ADDR:-0.0.0.0}"
 mkdir -p "$STATE" "$CFG_DIR" /root/.kube
 chmod 755 /data /data/am-state
 
@@ -17,7 +19,7 @@ write_cfg() {
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 networking:
-  apiServerAddress: "127.0.0.1"
+  apiServerAddress: "${API_ADDR}"
   apiServerPort: ${port}
 nodes:
 - role: control-plane
@@ -60,7 +62,13 @@ create_one() {
     am-dr-platform) kc="$STATE/kubeconfig.am-dr-platform.yaml" ;;
   esac
   kind get kubeconfig --name "$name" >"$kc"
-  chmod 0400 "$kc"
+  # Day-2 am-ops must read SoT path for terraform/kubectl (prod pattern).
+  chown am-ops:am-ops "$kc" 2>/dev/null || true
+  chmod 600 "$kc"
+  mkdir -p /home/am-ops/.asrax
+  cp -f "$kc" "/home/am-ops/.asrax/$(basename "$kc")"
+  chown am-ops:am-ops "/home/am-ops/.asrax/$(basename "$kc")" 2>/dev/null || true
+  chmod 600 "/home/am-ops/.asrax/$(basename "$kc")" 2>/dev/null || true
   # Also merge into root default for convenience (optional)
   KUBECONFIG="/root/.kube/config:$kc" kubectl config view --flatten > /root/.kube/config.merged 2>/dev/null || true
   if [[ -f /root/.kube/config.merged ]]; then

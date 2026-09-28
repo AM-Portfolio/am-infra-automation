@@ -1,0 +1,13 @@
+[Unit]
+Description=AM Kind prod-infra API exposer (Contabo blocks public :6443)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/socat TCP4-LISTEN:16443,bind=203.174.22.129,fork,reuseaddr TCP4:127.0.0.1:6443
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

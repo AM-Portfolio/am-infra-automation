@@ -34,7 +34,7 @@ output "cluster_services" {
 }
 
 output "creds_file" {
-  value = "/data/am-state/credentials/prod-infra-stores.env"
+  value = "/data/am-state/credentials/prod/infra-stores.env"
 }
 
 output "environment" {

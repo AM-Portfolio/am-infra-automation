@@ -59,6 +59,15 @@ resource "helm_release" "n8n" {
           port     = 443
         }
       }
+      # Platform / n8n scrape
+      podAnnotations = {
+        "prometheus.io/scrape" = "true"
+        "prometheus.io/port"   = "5678"
+        "prometheus.io/path"   = "/metrics"
+      }
+      extraEnv = [
+        { name = "N8N_METRICS", value = "true" },
+      ]
       resources = {
         requests = {
           cpu    = var.cpu_request

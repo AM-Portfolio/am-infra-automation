@@ -27,10 +27,11 @@ locals {
   )
 
   # Serve-first (64 GB): prod stacks that omit node_shape must be two (infra).
-  # Apps/platform pass node_shape=one explicitly. Compact/shrink unlock is later.
+  # Apps/platform pass node_shape=one explicitly. Apps may use split (CP+apps+agents workers).
   node_shape_ok = (
     (var.env == "prod" && local.node_shape == "two") ||
     (var.env == "prod" && local.node_shape == "one" && contains(["apps", "platform"], var.cluster_role)) ||
+    (local.node_shape == "split" && var.cluster_role == "apps") ||
     (var.env != "prod" && local.node_shape == "one")
   )
 
@@ -66,6 +67,17 @@ locals {
         certSANs:
           - "${var.vps_ip}"
       EOT
+    ] : [],
+    var.oidc_issuer_url != "" ? [
+      <<-EOT
+      kind: ClusterConfiguration
+      apiServer:
+        extraArgs:
+          oidc-issuer-url: "${var.oidc_issuer_url}"
+          oidc-client-id: "${var.oidc_client_id}"
+          oidc-username-claim: "email"
+          oidc-groups-claim: "groups"
+      EOT
     ] : []
   )
 
@@ -75,6 +87,25 @@ locals {
     nodeRegistration:
       kubeletExtraArgs:
         node-labels: "role=${local.role_label}"
+    EOT
+  ]
+
+  # Apps Kind split: dedicated workers for am-apps-* vs am-agents-* namespaces.
+  apps_worker_patches = [
+    <<-EOT
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "role=apps,workload=apps"
+    EOT
+  ]
+
+  agents_worker_patches = [
+    <<-EOT
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "role=agents,workload=agents"
     EOT
   ]
 
@@ -90,6 +121,16 @@ locals {
         role    = "worker"
         patches = local.worker_patches
       }
+    ] : [],
+    local.node_shape == "split" ? [
+      {
+        role    = "worker"
+        patches = local.apps_worker_patches
+      },
+      {
+        role    = "worker"
+        patches = local.agents_worker_patches
+      }
     ] : []
   )
 }
@@ -104,7 +145,7 @@ check "env_role_pairing" {
 check "node_shape_for_env" {
   assert {
     condition     = local.node_shape_ok
-    error_message = "Serve-first: prod infra = node_shape=two; prod apps/platform = one; dev/dr/obs = one. Pass node_shape explicitly on apps/platform."
+    error_message = "Serve-first: prod infra = node_shape=two; prod apps/platform = one; apps may use split; other non-prod = one."
   }
 }
 

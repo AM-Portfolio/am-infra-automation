@@ -1,0 +1,49 @@
+name: Edge primary (Contabo vs DR)
+
+# Flip bare asrax.in HTTPS CNAMEs between asrax-prod-tunnel and asrax-dr-tunnel.
+# Until CF Load Balancing is subscribed this is the SoT actuator (GrowthBook flag is visibility only).
+# *-dr.asrax.in hosts are never touched.
+#
+# GitHub Environments: edge-prod | edge-dr.
+# Secret: CLOUDFLARE_API_TOKEN (required). See FAILOVER.md § Team triggers.
+# Nonprod (preprod ↔ laptop): workflow nonprod-origin.yml
+
+on:
+  workflow_dispatch:
+    inputs:
+      primary:
+        description: Edge primary pool (prod = Contabo, dr = VPS3)
+        required: true
+        type: choice
+        options:
+          - prod
+          - dr
+      dry_run:
+        description: Print planned CNAME changes only
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  switch:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.primary == 'prod' && 'edge-prod' || 'edge-dr' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Switch edge primary
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PRIMARY: ${{ inputs.primary }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/kind-fleet/edge-primary.sh
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            ./scripts/kind-fleet/edge-primary.sh "${PRIMARY}" --dry-run
+          else
+            ./scripts/kind-fleet/edge-primary.sh "${PRIMARY}"
+          fi

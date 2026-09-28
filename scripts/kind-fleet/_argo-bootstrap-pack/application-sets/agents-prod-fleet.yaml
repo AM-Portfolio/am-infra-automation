@@ -1,0 +1,154 @@
+# Prod fleet ApplicationSet — all universal-chart {kind} (excl. n8n).
+# imageValues tracks feat/gitops-applicationset-dry until merge to main.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: am-agents-prod-fleet
+  namespace: argocd
+  annotations:
+    am.asrax.in/managed-by: application-set
+    am.asrax.in/fleet: prod
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-agents-prod
+            service: am-mcp-server
+            valuesRepo: https://github.com/AM-Portfolio/am-core-services.git
+            valuesRev: master
+            valuesPath: services/am-mcp-server/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-agents-prod
+            service: am-support-agent
+            valuesRepo: https://github.com/AM-Portfolio/am-agents.git
+            valuesRev: main
+            valuesPath: support-agent/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-agents-prod
+            service: am-mkt-agents
+            valuesRepo: https://github.com/AM-Portfolio/am-mkt-agents.git
+            valuesRev: feature/youtube-mkt-dashboard
+            valuesPath: mkt-agent/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-agents-prod
+            service: am-ai-gateway
+            valuesRepo: https://github.com/AM-Portfolio/am-gateways.git
+            valuesRev: main
+            valuesPath: mcp-gateway/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-agents-prod
+            service: am-asrax-ui
+            valuesRepo: https://github.com/AM-Portfolio/am-asrax.git
+            valuesRev: main
+            valuesPath: helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-agents-prod
+            service: am-db-agent
+            valuesRepo: https://github.com/AM-Portfolio/am-agents.git
+            valuesRev: main
+            valuesPath: db-agent/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-agents-prod
+            service: am-fin-agent
+            valuesRepo: https://github.com/AM-Portfolio/am-agents.git
+            valuesRev: main
+            valuesPath: fin-portfolio-agent/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-agents-prod
+            service: am-mkt-portal-ui
+            valuesRepo: https://github.com/AM-Portfolio/am-mkt-agents.git
+            valuesRev: feature/youtube-mkt-dashboard
+            valuesPath: mkt-portal-ui/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-agents-prod
+            service: am-qa-agents
+            valuesRepo: https://github.com/AM-Portfolio/am-qa-agents.git
+            valuesRev: main
+            valuesPath: qa-agent/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-agents-prod
+            service: am-tool-agent
+            valuesRepo: https://github.com/AM-Portfolio/am-agents.git
+            valuesRev: main
+            valuesPath: tool-agent/helm
+  template:
+    metadata:
+      name: '{{.service}}-{{.env}}'
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+      annotations:
+        am.asrax.in/env: '{{.env}}'
+        am.asrax.in/managed-by: application-set
+        am.asrax.in/kind: agents
+        am.asrax.in/fleet: prod
+      labels:
+        am.asrax.in/env: '{{.env}}'
+        am.asrax.in/kind: agents
+        am.asrax.in/fleet: prod
+    spec:
+      project: '{{.project}}'
+      sources:
+        - repoURL: https://github.com/AM-Portfolio/am-pipelines.git
+          targetRevision: main
+          path: helm/universal-chart
+          helm:
+            releaseName: '{{.service}}-{{.env}}'
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - '{{`$imageValues`}}/overlays/{{.env}}/hostaliases-kind-fleet-vps.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/hostaliases-kind-local.yaml'
+              - '{{`$values`}}/{{.valuesPath}}/values.yaml'
+              - '{{`$values`}}/{{.valuesPath}}/vault-mappings.yaml'
+              - '{{`$values`}}/{{.valuesPath}}/values.{{.env}}.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/fleet-common.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/vault-https-preprod.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/otel.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/spring-slow-start.yaml'
+              - '{{`$imageValues`}}/overlays/common/spring-slow-start.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/extra-{{.service}}.yaml'
+              - '{{`$imageValues`}}/overlays/common/extra-{{.service}}.yaml'
+              - '{{`$values`}}/{{.valuesPath}}/ci-image.yaml'
+              # Prod fleet: image-tags last so accidental ci-image on values main cannot override pins.
+              - '{{`$imageValues`}}/{{.env}}/image-tags/{{.service}}.yaml'
+        - repoURL: '{{.valuesRepo}}'
+          targetRevision: '{{.valuesRev}}'
+          ref: values
+        - repoURL: https://github.com/AM-Portfolio/am-gitops.git
+          targetRevision: main
+          ref: imageValues
+      destination:
+        name: '{{.destName}}'
+        namespace: '{{.destNamespace}}'
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=false
+          - RespectIgnoreDifferences=true
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas

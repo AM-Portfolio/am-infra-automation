@@ -65,6 +65,41 @@ run "dev_hosts_use_env_suffix" {
     condition     = output.identity_oidc_issuer == "https://auth-dev.asrax.in/realms/am-realm"
     error_message = "dev OIDC issuer must be auth-dev.asrax.in"
   }
+
+  assert {
+    condition     = output.mongo_host == "mongodb-dev.asrax.in" && output.redis_host == "redis-dev.asrax.in"
+    error_message = "classic dig store_hosts=env must use *-dev store FQDNs"
+  }
+}
+
+run "contabo_dev_uses_prod_store_hosts" {
+  command = plan
+  variables {
+    env                     = "dev"
+    domain                  = "asrax.in"
+    store_hosts             = "contabo_prod"
+    postgres_user           = "postgres"
+    postgres_password       = "pg-test-pass-xxxxxxxx"
+    mongo_user              = "admin"
+    mongo_password          = "mongo-test-pass-xxxxxx"
+    redis_password          = "redis-test-pass-xxxxxx"
+    influx_token            = "influx-token-xxxxxxxxxx"
+    influx_org              = "am"
+    influx_bucket           = "metrics"
+    keycloak_admin_user     = "admin"
+    keycloak_admin_password = "real-kc-admin-password-24"
+  }
+
+  assert {
+    condition = (
+      output.store_hosts_profile == "contabo_prod" &&
+      output.mongo_host == "mongo.asrax.in" &&
+      output.redis_host == "redis.asrax.in" &&
+      output.postgres_host == "postgres.asrax.in" &&
+      output.identity_oidc_issuer == "https://auth-dev.asrax.in/realms/am-realm"
+    )
+    error_message = "Contabo dig must keep dig Vault/OIDC paths but Contabo prod store hosts"
+  }
 }
 
 run "empty_admin_password_fails" {

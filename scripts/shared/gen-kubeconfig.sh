@@ -1,4 +1,7 @@
 #!/bin/bash
+# BREAK-GLASS ONLY (iam-sso). Do not distribute to teammates.
+# Day-to-day: Keycloak SSO + Headlamp / kubectl oidc-login.
+# See docs/kind-fleet-clusters/iam-sso/
 set -e
 echo "[1/4] Creating serviceaccount..."
 docker exec am-preprod-control-plane kubectl create serviceaccount am-admin -n kube-system --kubeconfig /etc/kubernetes/admin.conf 2>/dev/null || true
@@ -31,4 +34,4 @@ KUBECONFIG
 
 echo "[4/4] Verifying..."
 kubectl --kubeconfig /data/am-state/am-preprod-config get nodes
-echo "KUBECONFIG_OK"
+echo "KUBECONFIG_OK (break-glass — rotate if shared)"

@@ -438,6 +438,7 @@ spec:
   headers:
     customRequestHeaders:
       X-Forwarded-Proto: "https"
+      X-Forwarded-Port: "443"
 YAML
 
   depends_on = [helm_release.traefik]

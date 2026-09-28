@@ -1,0 +1,7 @@
+tunnel_id             = "" # asrax-preprod / Contabo nonprod tunnel
+cloudflare_api_token  = ""
+cloudflare_account_id = ""
+manage_dns            = true
+enable_argo_patch     = false
+# argo_kubeconfig     = "/data/am-state/kubeconfig.contabo-argo.yaml"
+# kind_api_origin     = "https://127.0.0.1:6443"

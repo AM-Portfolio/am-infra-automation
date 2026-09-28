@@ -35,7 +35,14 @@ resource "kubernetes_deployment" "litellm" {
     replicas = 1
     selector { match_labels = { app = "litellm" } }
     template {
-      metadata { labels = { app = "litellm" } }
+      metadata {
+        labels = { app = "litellm" }
+        annotations = {
+          "prometheus.io/scrape" = "true"
+          "prometheus.io/port"   = "4000"
+          "prometheus.io/path"   = "/metrics"
+        }
+      }
       spec {
         container {
           name  = "litellm"

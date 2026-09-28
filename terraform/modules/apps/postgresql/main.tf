@@ -77,6 +77,11 @@ resource "kubernetes_stateful_set" "postgresql" {
     template {
       metadata {
         labels = { app = "postgresql" }
+        annotations = {
+          "prometheus.io/scrape" = "true"
+          "prometheus.io/port"   = "9187"
+          "prometheus.io/path"   = "/metrics"
+        }
       }
       spec {
         node_selector = {
@@ -97,6 +102,37 @@ resource "kubernetes_stateful_set" "postgresql" {
           resources {
             requests = { memory = var.memory_request, cpu = var.cpu_request }
             limits   = { memory = var.memory_limit, cpu = var.cpu_limit }
+          }
+        }
+        container {
+          name  = "postgres-exporter"
+          image = "quay.io/prometheuscommunity/postgres-exporter:v0.15.0"
+          port { container_port = 9187 }
+          env {
+            name = "DATA_SOURCE_USER"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.postgres_secret.metadata[0].name
+                key  = "POSTGRES_USER"
+              }
+            }
+          }
+          env {
+            name = "DATA_SOURCE_PASS"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.postgres_secret.metadata[0].name
+                key  = "POSTGRES_PASSWORD"
+              }
+            }
+          }
+          env {
+            name  = "DATA_SOURCE_URI"
+            value = "127.0.0.1:5432/${var.db_name}?sslmode=disable"
+          }
+          resources {
+            requests = { memory = "32Mi", cpu = "10m" }
+            limits   = { memory = "64Mi", cpu = "100m" }
           }
         }
         volume {
