@@ -60,7 +60,7 @@ Detail: [dr/README.md](dr/README.md) · [dr/SIZING.md](dr/SIZING.md).
 
 ## Not in this pack (pointers)
 
-- Phase 7 promote / fence VPS1 · Phase 8 rebuild VPS1 · Phase 9 failback · Phase 12 drill — [TODO.md](TODO.md) / skill `reference/phase-6-12.md`
+- Phase 7 promote / freeze VPS1 · Phase 8 rebuild VPS1 · Phase 9 failback · Phase 12 drill — [TODO.md](TODO.md) / skill `reference/phase-6-12.md`
 - VPS2 obs: Phase 11 · [OBS_DEPLOY.md](OBS_DEPLOY.md) · [`obs/`](obs/) · [OBS_VPS2_SIZING.md](OBS_VPS2_SIZING.md)
 
 ## Refuse
