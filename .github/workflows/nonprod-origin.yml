@@ -1,0 +1,58 @@
+name: Nonprod origin (VPS vs laptop)
+
+# Flip Workers KV nonprod/origin for Worker am-nonprod-origin (am-preprod.asrax.in).
+# vps = Contabo asrax-preprod (nonprod-main); local = laptop asrax-dev (nonprod-dr).
+# See am-gitops/docs/NONPROD_DUAL.md. Break-glass: scripts/kind-fleet/nonprod-origin.sh
+#
+# GitHub Environments: nonprod-vps | nonprod-local (required reviewers recommended).
+# Secrets (per Environment):
+#   CLOUDFLARE_API_TOKEN   — required (Workers KV write)
+#   CF_ACCOUNT_ID          — optional (script default: Asrax account)
+#   CF_KV_NAMESPACE_ID     — optional (script default: ORIGIN_KV from wrangler.toml)
+# Full table: docs/kind-fleet-clusters/identity-infra-split/FAILOVER.md § Team triggers
+
+on:
+  workflow_dispatch:
+    inputs:
+      origin:
+        description: Nonprod edge origin (vps = Contabo preprod, local = laptop nonprod-dr)
+        required: true
+        type: choice
+        options:
+          - vps
+          - local
+      dry_run:
+        description: Print planned KV change only
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  switch:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.origin == 'vps' && 'nonprod-vps' || 'nonprod-local' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Switch nonprod origin
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Optional overrides (defaults in script match wrangler.toml / Asrax account)
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+          ORIGIN: ${{ inputs.origin }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/kind-fleet/nonprod-origin.sh
+          # Empty optional secrets → unset so script defaults apply
+          [[ -n "${CF_ACCOUNT_ID:-}" ]] || unset CF_ACCOUNT_ID
+          [[ -n "${CF_KV_NAMESPACE_ID:-}" ]] || unset CF_KV_NAMESPACE_ID
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            ./scripts/kind-fleet/nonprod-origin.sh "${ORIGIN}" --dry-run
+          else
+            ./scripts/kind-fleet/nonprod-origin.sh "${ORIGIN}"
+          fi

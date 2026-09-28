@@ -1,0 +1,36 @@
+http:
+  routers:
+    grafana:
+      rule: Host(`grafana.asrax.in`)
+      entryPoints: [web]
+      service: grafana
+    loki:
+      rule: Host(`loki.asrax.in`)
+      entryPoints: [web]
+      service: loki
+    prometheus:
+      rule: Host(`prometheus.asrax.in`)
+      entryPoints: [web]
+      service: prometheus
+    tempo:
+      rule: Host(`tempo.asrax.in`)
+      entryPoints: [web]
+      service: tempo
+
+  services:
+    grafana:
+      loadBalancer:
+        servers:
+          - url: http://grafana:3000
+    loki:
+      loadBalancer:
+        servers:
+          - url: http://loki:3100
+    prometheus:
+      loadBalancer:
+        servers:
+          - url: http://prometheus:9090
+    tempo:
+      loadBalancer:
+        servers:
+          - url: http://tempo:3200

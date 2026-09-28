@@ -121,7 +121,10 @@ module "minio" {
   minio_root_password = random_password.minio.result
   # Quay/Docker Hub MinIO pulls return 401 — image built on VPS from GitHub binary + kind load
   image               = "am-local/minio:RELEASE.2025-09-07T16-13-09Z"
-  oidc_enabled        = false
+  oidc_enabled        = try(var.oidc_client_secrets["minio"], "") != ""
+  oidc_issuer_url     = "https://auth.asrax.in/realms/am-realm"
+  oidc_client_id      = "minio"
+  oidc_client_secret  = try(var.oidc_client_secrets["minio"], "")
   enable_gateway      = true
   cpu_request         = module.sizing.minio.cpu_request
   cpu_limit           = module.sizing.minio.cpu_limit
@@ -144,6 +147,10 @@ module "vault" {
   enable_watcher      = true
   enable_host_aliases = false
   enable_gateway      = true
+  oidc_enabled        = try(var.oidc_client_secrets["vault-ui"], "") != ""
+  oidc_discovery_url  = "https://auth.asrax.in/realms/am-realm"
+  oidc_client_id      = "vault-ui"
+  oidc_client_secret  = try(var.oidc_client_secrets["vault-ui"], "")
   cpu_request         = module.sizing.vault.cpu_request
   cpu_limit           = module.sizing.vault.cpu_limit
   memory_request      = module.sizing.vault.memory_request

@@ -1,0 +1,75 @@
+// Grafana Alloy — VPS2 Compose self-telemetry (environment=obs).
+// Docker logs to local Loki; hub scrapes live in prometheus.yml.
+
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+  rule {
+    replacement  = "vps-obs"
+    target_label = "vps"
+  }
+  rule {
+    replacement  = "VPS_OBS"
+    target_label = "vps_name"
+  }
+  rule {
+    replacement  = "129.121.132.116"
+    target_label = "vps_ip"
+  }
+  rule {
+    replacement  = "obs"
+    target_label = "environment"
+  }
+  rule {
+    replacement  = "am-obs"
+    target_label = "cluster"
+  }
+  rule {
+    replacement  = "docker"
+    target_label = "job"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  labels     = {
+    vps         = "vps-obs",
+    vps_name    = "VPS_OBS",
+    vps_ip      = "129.121.132.116",
+    environment = "obs",
+    cluster     = "am-obs",
+  }
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+  external_labels = {
+    vps         = "vps-obs",
+    vps_name    = "VPS_OBS",
+    vps_ip      = "129.121.132.116",
+    cluster     = "am-obs",
+    environment = "obs",
+  }
+}

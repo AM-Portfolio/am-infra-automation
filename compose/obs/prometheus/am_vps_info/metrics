@@ -1,0 +1,7 @@
+# HELP am_vps_info AM fleet VPS inventory (stable id + display labels).
+# TYPE am_vps_info gauge
+am_vps_info{vps="vps-prod",vps_name="VPS_PROD",vps_ip="203.174.22.129",vps_display="VPS_PROD (203.174.22.129)",cluster="am-prod-apps",environment="prod"} 1
+am_vps_info{vps="vps-dr",vps_name="VPS_DR",vps_ip="129.121.128.131",vps_display="VPS_DR (129.121.128.131)",cluster="am-dr-apps",environment="dr"} 1
+am_vps_info{vps="vps-preprod",vps_name="VPS_PREPROD",vps_ip="103.127.146.57",vps_display="VPS_PREPROD (103.127.146.57)",cluster="am-vps-nonprod",environment="preprod"} 1
+am_vps_info{vps="vps-dev",vps_name="VPS_DEV",vps_ip="laptop",vps_display="VPS_DEV (laptop)",cluster="am-dev-apps",environment="dev"} 1
+am_vps_info{vps="vps-obs",vps_name="VPS_OBS",vps_ip="129.121.132.116",vps_display="VPS_OBS (129.121.132.116)",cluster="am-obs",environment="obs"} 1

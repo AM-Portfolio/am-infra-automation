@@ -1,0 +1,11 @@
+# Example tfvars — copy to terraform.tfvars locally (never commit tokens).
+# Tunnel UUIDs are not secrets; API token is.
+
+# cloudflare_api_token  = "..."
+# cloudflare_account_id = "23061f216225f4e2921ba51c2801874d"
+# prod_tunnel_id        = "68770b3c-a4a1-43ee-9c53-adaf47760132"
+# dr_tunnel_id          = "64cd1dd4-ccd1-4c41-8233-d0525c3f05cf"
+# dr_pool_enabled       = true
+# notification_email    = "ops@asrax.in"
+# monitor_interval      = 60
+# monitor_consecutive_down = 2

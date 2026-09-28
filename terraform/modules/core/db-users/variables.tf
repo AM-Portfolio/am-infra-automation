@@ -121,12 +121,13 @@ variable "mongodb_project_id" {
 #   }
 # ------------------------------------------------------------------------------
 variable "postgresql_app_users" {
-  description = "Map of application PostgreSQL users. In shared_database mode, schemas isolate the user; set database + createdb for apps (e.g. Lago) that need a dedicated DB and Rails db:create."
+  description = "Map of application PostgreSQL users. In shared_database mode, schemas isolate the user; set database + createdb for apps (e.g. Lago) that need a dedicated DB and Rails db:create. extra_databases: additional owned DBs (Temporal visibility)."
   type = map(object({
-    password  = string
-    database  = optional(string, "")
-    schemas   = optional(list(string), [])
-    createdb  = optional(bool, false)
+    password         = string
+    database         = optional(string, "")
+    schemas          = optional(list(string), [])
+    createdb         = optional(bool, false)
+    extra_databases  = optional(list(string), [])
   }))
   default = {}
 }

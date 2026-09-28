@@ -1,5 +1,5 @@
 # Grafana Alloy DaemonSet — pod logs → Loki; optional annotation scrape → Prometheus remote_write.
-# Labels: cluster, environment (am-obs contract). Cross-cluster URLs must be HTTPS.
+# Labels: vps, vps_name, vps_ip, cluster, environment (am-obs contract). Cross-cluster URLs must be HTTPS.
 
 terraform {
   required_providers {
@@ -32,6 +32,21 @@ variable "cluster_name" {
 variable "environment" {
   type    = string
   default = "dev"
+}
+
+variable "vps" {
+  description = "Stable VPS id (e.g. vps-prod). Immutable across name/IP changes."
+  type        = string
+}
+
+variable "vps_name" {
+  description = "Display VPS name (e.g. VPS_PROD)."
+  type        = string
+}
+
+variable "vps_ip" {
+  description = "Public VPS IP or host token (e.g. 203.174.22.129 or laptop)."
+  type        = string
 }
 
 variable "loki_push_url" {
@@ -81,13 +96,12 @@ locals {
   metrics_enabled = trimspace(var.prometheus_remote_write_url) != ""
   cf_headers_on   = trimspace(var.cf_access_client_id) != "" && trimspace(var.cf_access_client_secret) != ""
 
-  cf_header_block = local.cf_headers_on ? <<-H
-        headers = {
-          "CF-Access-Client-Id"     = "${var.cf_access_client_id}"
-          "CF-Access-Client-Secret" = "${var.cf_access_client_secret}"
-        }
-  H
-  : ""
+  cf_header_block = local.cf_headers_on ? join("\n", [
+    "        headers = {",
+    "          \"CF-Access-Client-Id\"     = \"${var.cf_access_client_id}\"",
+    "          \"CF-Access-Client-Secret\" = \"${var.cf_access_client_secret}\"",
+    "        }",
+  ]) : ""
 
   # Cross-cluster FQDNs must be HTTPS; allow in-cluster *.svc.cluster.local over HTTP.
   loki_ok = (
@@ -165,6 +179,115 @@ locals {
     "  targets         = discovery.relabel.metrics_pods.output",
     "  forward_to      = [prometheus.remote_write.fleet.receiver]",
     "  scrape_interval = \"30s\"",
+    "  // Keep exporter metric labels (e.g. am_release_* namespace=am-apps-*) over k8s target labels.",
+    "  honor_labels    = true",
+    "}",
+    "",
+    "// kube-state-metrics — Platform Infra Overview kube_* panels",
+    "discovery.kubernetes \"ksm_services\" {",
+    "  role = \"service\"",
+    "}",
+    "",
+    "discovery.relabel \"kube_state_metrics\" {",
+    "  targets = discovery.kubernetes.ksm_services.targets",
+    "",
+    "  rule {",
+    "    source_labels = [\"__meta_kubernetes_service_label_app_kubernetes_io_name\", \"__meta_kubernetes_service_name\"]",
+    "    separator     = \";\"",
+    "    regex         = \".*kube-state-metrics.*\"",
+    "    action        = \"keep\"",
+    "  }",
+    "  rule {",
+    "    source_labels = [\"__meta_kubernetes_service_port_number\"]",
+    "    regex         = \"^(8080|8081)$\"",
+    "    action        = \"keep\"",
+    "  }",
+    "  // Do NOT rewrite metric `namespace` with the KSM Service namespace (monitoring).",
+    "  // kube_* series already carry the workload namespace label.",
+    "}",
+    "",
+    "prometheus.scrape \"kube_state_metrics\" {",
+    "  targets         = discovery.relabel.kube_state_metrics.output",
+    "  forward_to      = [prometheus.remote_write.fleet.receiver]",
+    "  scrape_interval = \"30s\"",
+    "}",
+    "",
+    "// node-exporter — Platform Overview disk Total/Used/Free (node_filesystem_*)",
+    "discovery.kubernetes \"node_exporter_services\" {",
+    "  role = \"service\"",
+    "}",
+    "",
+    "discovery.relabel \"node_exporter\" {",
+    "  targets = discovery.kubernetes.node_exporter_services.targets",
+    "",
+    "  rule {",
+    "    source_labels = [\"__meta_kubernetes_service_label_app_kubernetes_io_name\", \"__meta_kubernetes_service_name\"]",
+    "    separator     = \";\"",
+    "    regex         = \".*node-exporter.*\"",
+    "    action        = \"keep\"",
+    "  }",
+    "  rule {",
+    "    source_labels = [\"__meta_kubernetes_service_port_number\"]",
+    "    regex         = \"^(9100)$\"",
+    "    action        = \"keep\"",
+    "  }",
+    "  rule {",
+    "    source_labels = [\"__meta_kubernetes_pod_node_name\", \"__meta_kubernetes_endpoint_node_name\"]",
+    "    separator     = \";\"",
+    "    regex         = \"^([^;]+);.*$|;(.+)$\"",
+    "    replacement   = \"$1$2\"",
+    "    target_label  = \"instance\"",
+    "  }",
+    "  rule {",
+    "    source_labels = [\"__meta_kubernetes_namespace\"]",
+    "    target_label  = \"namespace\"",
+    "  }",
+    "}",
+    "",
+    "prometheus.scrape \"node_exporter\" {",
+    "  targets         = discovery.relabel.node_exporter.output",
+    "  forward_to      = [prometheus.remote_write.fleet.receiver]",
+    "  scrape_interval = \"30s\"",
+    "}",
+    "",
+    "// kubelet cadvisor — machine_* / container_* capacity metrics",
+    "discovery.kubernetes \"nodes\" {",
+    "  role = \"node\"",
+    "}",
+    "",
+    "discovery.relabel \"cadvisor\" {",
+    "  targets = discovery.kubernetes.nodes.targets",
+    "",
+    "  rule {",
+    "    target_label = \"__address__\"",
+    "    replacement  = \"kubernetes.default.svc.cluster.local:443\"",
+    "  }",
+    "  rule {",
+    "    source_labels = [\"__meta_kubernetes_node_name\"]",
+    "    regex         = \"(.+)\"",
+    "    replacement   = \"/api/v1/nodes/$1/proxy/metrics/cadvisor\"",
+    "    target_label  = \"__metrics_path__\"",
+    "  }",
+    "  rule {",
+    "    source_labels = [\"__meta_kubernetes_node_name\"]",
+    "    target_label  = \"node\"",
+    "  }",
+    "  rule {",
+    "    source_labels = [\"__meta_kubernetes_node_name\"]",
+    "    target_label  = \"instance\"",
+    "  }",
+    "}",
+    "",
+    "prometheus.scrape \"cadvisor\" {",
+    "  targets             = discovery.relabel.cadvisor.output",
+    "  forward_to          = [prometheus.remote_write.fleet.receiver]",
+    "  scrape_interval     = \"30s\"",
+    "  scheme              = \"https\"",
+    "  bearer_token_file   = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"",
+    "  tls_config {",
+    "    insecure_skip_verify = true",
+    "    ca_file              = \"/var/run/secrets/kubernetes.io/serviceaccount/ca.crt\"",
+    "  }",
     "}",
     "",
     "prometheus.remote_write \"fleet\" {",
@@ -173,6 +296,9 @@ locals {
     local.cf_headers_on ? "    headers = {\n      \"CF-Access-Client-Id\" = \"${var.cf_access_client_id}\"\n      \"CF-Access-Client-Secret\" = \"${var.cf_access_client_secret}\"\n    }" : "",
     "  }",
     "  external_labels = {",
+    "    vps         = \"${var.vps}\",",
+    "    vps_name    = \"${var.vps_name}\",",
+    "    vps_ip      = \"${var.vps_ip}\",",
     "    cluster     = \"${var.cluster_name}\",",
     "    environment = \"${var.environment}\",",
     "  }",
@@ -207,6 +333,18 @@ locals {
       rule {
         source_labels = ["__meta_kubernetes_pod_node_name"]
         target_label  = "node"
+      }
+      rule {
+        target_label = "vps"
+        replacement  = "${var.vps}"
+      }
+      rule {
+        target_label = "vps_name"
+        replacement  = "${var.vps_name}"
+      }
+      rule {
+        target_label = "vps_ip"
+        replacement  = "${var.vps_ip}"
       }
       rule {
         target_label = "cluster"
@@ -254,6 +392,9 @@ locals {
         ${local.cf_headers_on ? "headers = {\n          \"CF-Access-Client-Id\"     = \"${var.cf_access_client_id}\"\n          \"CF-Access-Client-Secret\" = \"${var.cf_access_client_secret}\"\n        }" : ""}
       }
       external_labels = {
+        vps         = "${var.vps}",
+        vps_name    = "${var.vps_name}",
+        vps_ip      = "${var.vps_ip}",
         cluster     = "${var.cluster_name}",
         environment = "${var.environment}",
       }

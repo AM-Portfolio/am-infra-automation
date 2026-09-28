@@ -4,9 +4,11 @@
 # Phase 1: validate only. Do not terraform apply or kind create.
 
 module "cluster" {
-  source       = "../../../modules/core/cluster"
-  env          = "dev"
-  cluster_role = "infra"
+  source          = "../../../modules/core/cluster"
+  env             = "dev"
+  cluster_role    = "infra"
+  oidc_issuer_url = "https://auth-dev.asrax.in/realms/am-realm"
+  oidc_client_id  = "kubectl"
 }
 
 output "cluster_name" {

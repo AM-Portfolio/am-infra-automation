@@ -1,0 +1,3 @@
+# Example — identity-infra-split target (2 Kind Contabo).
+# Copy values into backend apply vars when ready to co-locate; do not apply blindly on live platform Kind.
+co_locate_on_infra = true

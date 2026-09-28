@@ -17,8 +17,8 @@ variable "host_label" {
   type        = string
 }
 
-variable "use_bare_fqdn" {
-  description = "If true, FQDN is host_label.root_domain (no env suffix). Shared obs hub."
+variable "also_match_bare" {
+  description = "When true (DR behind CF LB), IngressRoute also matches host_label.root_domain alongside the env-suffixed FQDN."
   type        = bool
   default     = false
 }

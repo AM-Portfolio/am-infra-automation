@@ -1,5 +1,6 @@
 # Phase 3a–3d platform (prod): Keycloak + Argo + Temporal + Lago + P1 UIs.
-# Traefik stays on infra; cross-cluster-http bridges published bare hosts.
+# identity-infra-split: set co_locate_on_infra=true to run workloads on am-prod-infra (no platform Kind).
+# Default false preserves legacy am-prod-platform until Contabo migration soak.
 # Apply on VPS1 only. State: /data/am-state/terraform/prod/platform/
 
 resource "terraform_data" "env_folder_guard" {
@@ -17,7 +18,9 @@ module "sizing" {
   environment = local.env
 }
 
+# Legacy third Kind — skipped when co_locate_on_infra (default).
 module "cluster" {
+  count              = local.co_locate_on_infra ? 0 : 1
   source             = "../../../modules/core/cluster"
   env                = local.env
   cluster_role       = "platform"
@@ -29,9 +32,10 @@ module "cluster" {
 }
 
 resource "null_resource" "kubeconfig_asrax" {
+  count = local.co_locate_on_infra ? 0 : 1
   triggers = {
-    cluster = module.cluster.cluster_name
-    endpoint = module.cluster.endpoint
+    cluster  = module.cluster[0].cluster_name
+    endpoint = module.cluster[0].endpoint
   }
   provisioner "local-exec" {
     command = "mkdir -p /home/am-ops/.asrax && cp -f /data/am-state/kubeconfig.am-prod-platform.yaml /home/am-ops/.asrax/kubeconfig.am-prod-platform.yaml && chmod 600 /home/am-ops/.asrax/kubeconfig.am-prod-platform.yaml && chown am-ops:am-ops /home/am-ops/.asrax/kubeconfig.am-prod-platform.yaml || true"
@@ -40,12 +44,18 @@ resource "null_resource" "kubeconfig_asrax" {
 }
 
 data "external" "platform_node_ip" {
+  count      = local.co_locate_on_infra ? 0 : 1
   program    = ["bash", "${path.module}/scripts/platform-ip.sh"]
   depends_on = [module.cluster]
 }
 
+resource "terraform_data" "kind_ready" {
+  input = local.co_locate_on_infra ? "am-prod-infra" : module.cluster[0].cluster_name
+}
+
 locals {
-  platform_ip = coalesce(var.platform_node_ip, try(data.external.platform_node_ip.result.ip, ""))
+  platform_ip = local.co_locate_on_infra ? "" : coalesce(var.platform_node_ip, try(data.external.platform_node_ip[0].result.ip, ""))
+  kind_name   = local.co_locate_on_infra ? "am-prod-infra" : module.cluster[0].cluster_name
   # Bare prod store hosts (Phase 2 exposer / DNS-only).
   pg_host    = "postgres.${local.domain}"
   mongo_host = "mongo.${local.domain}"
@@ -62,12 +72,12 @@ module "namespaces" {
   create_monitoring = false
   extra_namespaces  = ["argocd", "temporal", "billing", "n8n", "growthbook", "openproject", "am-ai", "notification"]
 
-  depends_on = [module.cluster]
+  depends_on = [terraform_data.kind_ready]
 }
 
 module "image_preload_3d" {
   source       = "../../../modules/core/kind-image-preload"
-  cluster_name = module.cluster.cluster_name
+  cluster_name = local.kind_name
   images = [
     "n8nio/n8n:1.109.2",
     "openproject/openproject:14",
@@ -81,7 +91,7 @@ module "image_preload_3d" {
     "ghcr.io/novuhq/novu/ws:2.1.0",
   ]
 
-  depends_on = [module.cluster]
+  depends_on = [terraform_data.kind_ready]
 }
 
 module "keycloak" {
@@ -96,7 +106,7 @@ module "keycloak" {
   db_password          = var.keycloak_db_password
   node_port            = 30808
   enable_gateway       = true
-  gateway_same_cluster = false
+  gateway_same_cluster = local.gateway_same_cluster
   manage_realm         = true
   create_test_users    = true
   mfa_enforce          = false
@@ -117,7 +127,7 @@ module "argocd" {
   namespace                  = "argocd"
   node_port                  = 30443
   enable_gateway             = true
-  gateway_same_cluster       = false
+  gateway_same_cluster       = local.gateway_same_cluster
   oidc_issuer                = module.keycloak.issuer_url
   oidc_client_secret         = ""
   enable_oidc_secret         = false
@@ -149,7 +159,7 @@ resource "null_resource" "argocd_oidc_patch" {
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
     environment = {
-      KUBECONFIG = "/data/am-state/kubeconfig.am-prod-platform.yaml"
+      KUBECONFIG = local.workload_kubeconfig
       SECRET     = try(module.keycloak.oidc_client_secrets["argocd"], "")
     }
     command = <<-BASH
@@ -167,6 +177,7 @@ resource "null_resource" "argocd_oidc_patch" {
 
 module "route_auth" {
   source = "../../../modules/core/cross-cluster-http"
+  count  = local.cross_cluster_routes ? 1 : 0
   providers = {
     kubernetes = kubernetes.infra
     kubectl    = kubectl.infra
@@ -181,11 +192,12 @@ module "route_auth" {
   backend_ip   = local.platform_ip
   backend_port = module.keycloak.node_port
 
-  depends_on = [module.keycloak, data.external.platform_node_ip]
+  depends_on = [module.keycloak]
 }
 
 module "route_argocd" {
   source = "../../../modules/core/cross-cluster-http"
+  count  = local.cross_cluster_routes ? 1 : 0
   providers = {
     kubernetes = kubernetes.infra
     kubectl    = kubectl.infra
@@ -200,7 +212,7 @@ module "route_argocd" {
   backend_ip   = local.platform_ip
   backend_port = module.argocd.node_port
 
-  depends_on = [module.argocd, data.external.platform_node_ip]
+  depends_on = [module.argocd]
 }
 
 module "temporal" {
@@ -215,7 +227,7 @@ module "temporal" {
   db_password           = var.temporal_db_password
   node_port             = 30823
   enable_gateway        = true
-  gateway_same_cluster  = false
+  gateway_same_cluster  = local.gateway_same_cluster
   chart_version         = "0.62.0"
   server_cpu_request    = module.sizing.temporal_server.cpu_request
   server_cpu_limit      = module.sizing.temporal_server.cpu_limit
@@ -231,6 +243,7 @@ module "temporal" {
 
 module "route_temporal" {
   source = "../../../modules/core/cross-cluster-http"
+  count  = local.cross_cluster_routes ? 1 : 0
   providers = {
     kubernetes = kubernetes.infra
     kubectl    = kubectl.infra
@@ -243,9 +256,9 @@ module "route_temporal" {
   service_port = 8080
   backend_host = "am-${local.env}-platform-control-plane"
   backend_ip   = local.platform_ip
-  backend_port = module.temporal.node_port
+  backend_port = try(module.oauth2_temporal[0].node_port, 0) > 0 ? module.oauth2_temporal[0].node_port : module.temporal.node_port
 
-  depends_on = [module.temporal, data.external.platform_node_ip]
+  depends_on = [module.temporal]
 }
 
 module "lago" {
@@ -263,7 +276,10 @@ module "lago" {
   redis_db             = 3
   node_port            = 30830
   enable_gateway       = true
-  gateway_same_cluster = false
+  gateway_same_cluster = local.gateway_same_cluster
+  # Known helm release name from modules/apps/oauth2-proxy (no module cycle).
+  oidc_proxy_service   = try(module.keycloak.oidc_client_secrets["lago"], "") != "" ? "oauth2-proxy-lago" : ""
+  oidc_proxy_port      = 80
   chart_version        = "1.28.0"
   api_cpu_request      = module.sizing.lago_api.cpu_request
   api_cpu_limit        = module.sizing.lago_api.cpu_limit
@@ -279,6 +295,7 @@ module "lago" {
 
 module "route_lago" {
   source = "../../../modules/core/cross-cluster-http"
+  count  = local.cross_cluster_routes ? 1 : 0
   providers = {
     kubernetes = kubernetes.infra
     kubectl    = kubectl.infra
@@ -291,9 +308,9 @@ module "route_lago" {
   service_port = 80
   backend_host = "am-${local.env}-platform-control-plane"
   backend_ip   = local.platform_ip
-  backend_port = module.lago.node_port
+  backend_port = try(module.oauth2_lago[0].node_port, 0) > 0 ? module.oauth2_lago[0].node_port : module.lago.node_port
 
-  depends_on = [module.lago, data.external.platform_node_ip]
+  depends_on = [module.lago]
 }
 
 module "n8n" {
@@ -312,7 +329,7 @@ module "n8n" {
   worker_replicas      = 1
   node_port            = 30567
   enable_gateway       = true
-  gateway_same_cluster = false
+  gateway_same_cluster = local.gateway_same_cluster
   image_repository     = "n8nio/n8n"
   image_tag            = "1.109.2"
   cpu_request          = module.sizing.n8n.cpu_request
@@ -325,6 +342,7 @@ module "n8n" {
 
 module "route_n8n" {
   source = "../../../modules/core/cross-cluster-http"
+  count  = local.cross_cluster_routes ? 1 : 0
   providers = {
     kubernetes = kubernetes.infra
     kubectl    = kubectl.infra
@@ -339,7 +357,7 @@ module "route_n8n" {
   backend_ip   = local.platform_ip
   backend_port = module.n8n.node_port
 
-  depends_on = [module.n8n, data.external.platform_node_ip]
+  depends_on = [module.n8n]
 }
 
 module "growthbook" {
@@ -353,7 +371,7 @@ module "growthbook" {
   mongo_password          = var.growthbook_mongo_password
   node_port               = 30300
   enable_gateway          = true
-  gateway_same_cluster    = false
+  gateway_same_cluster    = local.gateway_same_cluster
   frontend_cpu_request    = module.sizing.growthbook_frontend.cpu_request
   frontend_cpu_limit      = module.sizing.growthbook_frontend.cpu_limit
   frontend_memory_request = module.sizing.growthbook_frontend.memory_request
@@ -368,6 +386,7 @@ module "growthbook" {
 
 module "route_growthbook" {
   source = "../../../modules/core/cross-cluster-http"
+  count  = local.cross_cluster_routes ? 1 : 0
   providers = {
     kubernetes = kubernetes.infra
     kubectl    = kubectl.infra
@@ -382,7 +401,7 @@ module "route_growthbook" {
   backend_ip   = local.platform_ip
   backend_port = module.growthbook.node_port
 
-  depends_on = [module.growthbook, data.external.platform_node_ip]
+  depends_on = [module.growthbook]
 }
 
 module "openproject" {
@@ -397,7 +416,7 @@ module "openproject" {
   db_password          = var.openproject_db_password
   node_port            = 30080
   enable_gateway       = true
-  gateway_same_cluster = false
+  gateway_same_cluster = local.gateway_same_cluster
   cpu_request          = module.sizing.openproject.cpu_request
   cpu_limit            = module.sizing.openproject.cpu_limit
   memory_request       = module.sizing.openproject.memory_request
@@ -408,6 +427,7 @@ module "openproject" {
 
 module "route_openproject" {
   source = "../../../modules/core/cross-cluster-http"
+  count  = local.cross_cluster_routes ? 1 : 0
   providers = {
     kubernetes = kubernetes.infra
     kubectl    = kubectl.infra
@@ -422,7 +442,7 @@ module "route_openproject" {
   backend_ip   = local.platform_ip
   backend_port = module.openproject.node_port
 
-  depends_on = [module.openproject, data.external.platform_node_ip]
+  depends_on = [module.openproject]
 }
 
 module "litellm" {
@@ -437,7 +457,7 @@ module "litellm" {
   db_password          = var.litellm_db_password
   node_port            = 30400
   enable_gateway       = true
-  gateway_same_cluster = false
+  gateway_same_cluster = local.gateway_same_cluster
   cpu_request          = module.sizing.litellm.cpu_request
   cpu_limit            = module.sizing.litellm.cpu_limit
   memory_request       = module.sizing.litellm.memory_request
@@ -448,6 +468,7 @@ module "litellm" {
 
 module "route_litellm" {
   source = "../../../modules/core/cross-cluster-http"
+  count  = local.cross_cluster_routes ? 1 : 0
   providers = {
     kubernetes = kubernetes.infra
     kubectl    = kubectl.infra
@@ -460,9 +481,9 @@ module "route_litellm" {
   service_port = 4000
   backend_host = "am-${local.env}-platform-control-plane"
   backend_ip   = local.platform_ip
-  backend_port = module.litellm.node_port
+  backend_port = try(module.oauth2_litellm[0].node_port, 0) > 0 ? module.oauth2_litellm[0].node_port : module.litellm.node_port
 
-  depends_on = [module.litellm, data.external.platform_node_ip]
+  depends_on = [module.litellm]
 }
 
 module "langfuse" {
@@ -484,7 +505,7 @@ module "langfuse" {
   minio_bucket              = "platform"
   node_port                 = 30301
   enable_gateway            = true
-  gateway_same_cluster      = false
+  gateway_same_cluster      = local.gateway_same_cluster
   web_cpu_request           = module.sizing.langfuse_web.cpu_request
   web_cpu_limit             = module.sizing.langfuse_web.cpu_limit
   web_memory_request        = module.sizing.langfuse_web.memory_request
@@ -499,6 +520,7 @@ module "langfuse" {
 
 module "route_langfuse" {
   source = "../../../modules/core/cross-cluster-http"
+  count  = local.cross_cluster_routes ? 1 : 0
   providers = {
     kubernetes = kubernetes.infra
     kubectl    = kubectl.infra
@@ -511,9 +533,9 @@ module "route_langfuse" {
   service_port = 3000
   backend_host = "am-${local.env}-platform-control-plane"
   backend_ip   = local.platform_ip
-  backend_port = module.langfuse.node_port
+  backend_port = try(module.oauth2_langfuse[0].node_port, 0) > 0 ? module.oauth2_langfuse[0].node_port : module.langfuse.node_port
 
-  depends_on = [module.langfuse, data.external.platform_node_ip]
+  depends_on = [module.langfuse]
 }
 
 module "novu" {
@@ -530,7 +552,7 @@ module "novu" {
   redis_password        = var.redis_password
   node_port             = 30420
   enable_gateway        = true
-  gateway_same_cluster  = false
+  gateway_same_cluster  = local.gateway_same_cluster
   api_cpu_request       = module.sizing.novu_api.cpu_request
   api_cpu_limit         = module.sizing.novu_api.cpu_limit
   api_memory_request    = module.sizing.novu_api.memory_request
@@ -553,6 +575,7 @@ module "novu" {
 
 module "route_novu" {
   source = "../../../modules/core/cross-cluster-http"
+  count  = local.cross_cluster_routes ? 1 : 0
   providers = {
     kubernetes = kubernetes.infra
     kubectl    = kubectl.infra
@@ -567,7 +590,7 @@ module "route_novu" {
   backend_ip   = local.platform_ip
   backend_port = module.novu.node_port
 
-  depends_on = [module.novu, data.external.platform_node_ip]
+  depends_on = [module.novu]
 }
 
 resource "null_resource" "vault_oidc_secrets" {
@@ -575,6 +598,7 @@ resource "null_resource" "vault_oidc_secrets" {
 
   triggers = {
     secrets = sha256(jsonencode(module.keycloak.oidc_client_secrets))
+    env     = local.env
   }
 
   provisioner "local-exec" {
@@ -582,18 +606,27 @@ resource "null_resource" "vault_oidc_secrets" {
     environment = {
       VAULT_ADDR   = var.vault_addr
       VAULT_TOKEN  = var.vault_token
+      FLEET_ENV    = local.env
+      ISSUER_URL   = module.keycloak.issuer_url
       SECRETS_JSON = jsonencode(module.keycloak.oidc_client_secrets)
+      OIDC_ENV     = "/data/am-state/credentials/${local.env}/oidc.env"
     }
     command = <<-BASH
       set -euo pipefail
+      mkdir -p "$(dirname "$OIDC_ENV")"
+      umask 077
       python3 - <<'PY'
 import json, os, urllib.request
 addr = os.environ["VAULT_ADDR"].rstrip("/")
 token = os.environ["VAULT_TOKEN"]
+env = os.environ["FLEET_ENV"]
+issuer = os.environ["ISSUER_URL"]
 secrets = json.loads(os.environ["SECRETS_JSON"])
+oidc_path = os.environ["OIDC_ENV"]
+lines = [f"# OIDC clients for {env}. Not for git.", f"ISSUER_URL={issuer}"]
 for name, secret in secrets.items():
-    path = f"apps/data/prod/oidc/{name}"
-    body = json.dumps({"data": {"client_id": name, "client_secret": secret}}).encode()
+    path = f"apps/data/{env}/oidc/{name}"
+    body = json.dumps({"data": {"client_id": name, "client_secret": secret, "issuer_url": issuer}}).encode()
     req = urllib.request.Request(f"{addr}/v1/{path}", data=body, method="POST",
         headers={"X-Vault-Token": token, "Content-Type": "application/json"})
     try:
@@ -602,6 +635,12 @@ for name, secret in secrets.items():
     except Exception as e:
         print(f"vault_warn={path} err={e}")
         raise
+    safe = name.upper().replace("-", "_").replace(".", "_")
+    lines.append(f"OIDC_{safe}_CLIENT_ID={name}")
+    lines.append(f"OIDC_{safe}_CLIENT_SECRET={secret}")
+with open(oidc_path, "w", encoding="utf-8") as f:
+    f.write("\n".join(lines) + "\n")
+print(f"wrote {oidc_path}")
 PY
     BASH
   }
@@ -611,8 +650,9 @@ PY
 
 resource "null_resource" "write_keycloak_admin_env" {
   triggers = {
-    admin_pw = sha256(module.keycloak.admin_password)
+    admin_pw   = sha256(module.keycloak.admin_password)
     admin_user = module.keycloak.admin_user
+    env        = local.env
   }
 
   provisioner "local-exec" {
@@ -621,7 +661,11 @@ resource "null_resource" "write_keycloak_admin_env" {
       KC_ADMIN_USER = module.keycloak.admin_user
       KC_ADMIN_PASS = module.keycloak.admin_password
       KC_REALM      = "am-realm"
-      OUT_FILE      = "/data/am-state/credentials/prod-keycloak-admin.env"
+      KC_ISSUER     = module.keycloak.issuer_url
+      KC_AUTH_HOST  = module.keycloak.auth_host
+      FLEET_ENV     = local.env
+      OUT_FILE      = "/data/am-state/credentials/${local.env}/keycloak-admin.env"
+      COMPAT_LINK   = "/data/am-state/credentials/${local.env}-keycloak-admin.env"
     }
     command = <<-BASH
       set -euo pipefail
@@ -631,12 +675,47 @@ resource "null_resource" "write_keycloak_admin_env" {
 KEYCLOAK_ADMIN_USER=$KC_ADMIN_USER
 KEYCLOAK_ADMIN_PASSWORD=$KC_ADMIN_PASS
 KEYCLOAK_REALM=$KC_REALM
+KEYCLOAK_URL=https://$KC_AUTH_HOST
+ISSUER_URL=$KC_ISSUER
+FLEET_ENV=$FLEET_ENV
+EOF
+      ln -sfn "$OUT_FILE" "$COMPAT_LINK"
+      echo "wrote $OUT_FILE (compat $COMPAT_LINK)"
+    BASH
+  }
+
+  depends_on = [module.keycloak]
+}
+
+resource "null_resource" "write_argocd_admin_env" {
+  triggers = {
+    admin_pw = sha256(module.argocd.admin_password)
+    env      = local.env
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    environment = {
+      ARGO_PASS   = module.argocd.admin_password
+      ARGO_HOST   = module.argocd.argocd_host
+      FLEET_ENV   = local.env
+      OUT_FILE    = "/data/am-state/credentials/${local.env}/argocd-admin.env"
+    }
+    command = <<-BASH
+      set -euo pipefail
+      mkdir -p "$(dirname "$OUT_FILE")"
+      umask 077
+      cat > "$OUT_FILE" <<EOF
+ARGOCD_ADMIN_USER=admin
+ARGOCD_ADMIN_PASSWORD=$ARGO_PASS
+ARGOCD_HOST=https://$ARGO_HOST
+FLEET_ENV=$FLEET_ENV
 EOF
       echo "wrote $OUT_FILE"
     BASH
   }
 
-  depends_on = [module.keycloak]
+  depends_on = [module.argocd]
 }
 
 resource "null_resource" "vault_test_users" {
@@ -644,6 +723,7 @@ resource "null_resource" "vault_test_users" {
 
   triggers = {
     users = sha256(jsonencode(module.keycloak.test_user_passwords))
+    env   = local.env
   }
 
   provisioner "local-exec" {
@@ -651,28 +731,39 @@ resource "null_resource" "vault_test_users" {
     environment = {
       VAULT_ADDR  = var.vault_addr
       VAULT_TOKEN = var.vault_token
+      FLEET_ENV   = local.env
       USERS_JSON  = jsonencode(module.keycloak.test_user_passwords)
+      SSO_ENV     = "/data/am-state/credentials/${local.env}/sso-test-users.env"
     }
     command = <<-BASH
       set -euo pipefail
+      mkdir -p "$(dirname "$SSO_ENV")"
+      umask 077
       python3 - <<'PY'
 import json, os, urllib.request
 addr = os.environ["VAULT_ADDR"].rstrip("/")
 token = os.environ["VAULT_TOKEN"]
+env = os.environ["FLEET_ENV"]
 users = json.loads(os.environ["USERS_JSON"])
-path = "apps/data/prod/infra/keycloak-test-users"
+sso_path = os.environ["SSO_ENV"]
+path = f"apps/data/{env}/infra/keycloak-test-users"
 # KV v2 write body is {"data": <secret map>} — do not double-nest.
 secret = dict(users)
+lines = [f"# SSO test users for {env}. Not for git."]
 if "am-admin-test" in users:
     secret.setdefault("admin_username", "am-admin-test")
     secret.setdefault("admin_password", users["am-admin-test"])
     secret.setdefault("AM_ADMIN_TEST_USERNAME", "am-admin-test")
     secret.setdefault("AM_ADMIN_TEST_PASSWORD", users["am-admin-test"])
+    lines.append("AM_ADMIN_TEST_USERNAME=am-admin-test")
+    lines.append(f"AM_ADMIN_TEST_PASSWORD={users['am-admin-test']}")
 if "am-user-test" in users:
     secret.setdefault("user_username", "am-user-test")
     secret.setdefault("user_password", users["am-user-test"])
     secret.setdefault("AM_USER_TEST_USERNAME", "am-user-test")
     secret.setdefault("AM_USER_TEST_PASSWORD", users["am-user-test"])
+    lines.append("AM_USER_TEST_USERNAME=am-user-test")
+    lines.append(f"AM_USER_TEST_PASSWORD={users['am-user-test']}")
 body = json.dumps({"data": secret}).encode()
 req = urllib.request.Request(f"{addr}/v1/{path}", data=body, method="POST",
     headers={"X-Vault-Token": token, "Content-Type": "application/json"})
@@ -682,6 +773,9 @@ try:
 except Exception as e:
     print(f"vault_warn={path} err={e}")
     raise
+with open(sso_path, "w", encoding="utf-8") as f:
+    f.write("\n".join(lines) + "\n")
+print(f"wrote {sso_path}")
 PY
     BASH
   }
@@ -689,8 +783,35 @@ PY
   depends_on = [module.keycloak]
 }
 
-output "cluster_name" { value = module.cluster.cluster_name }
-output "api_server_port" { value = module.cluster.api_server_port }
+resource "null_resource" "credentials_readme" {
+  triggers = {
+    env = local.env
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    environment = {
+      FLEET_ENV = local.env
+      CREDS_DIR = "/data/am-state/credentials/${local.env}"
+    }
+    command = <<-BASH
+      set -euo pipefail
+      mkdir -p "$CREDS_DIR"
+      cat > "$CREDS_DIR/README.txt" <<EOF
+AM fleet credentials for env=$FLEET_ENV (host SoT under /data/am-state/credentials/$FLEET_ENV/).
+Files: keycloak-admin.env, infra-stores.env, oidc.env, sso-test-users.env, argocd-admin.env, vault-root.env
+Compat symlinks: /data/am-state/credentials/$FLEET_ENV-keycloak-admin.env, $FLEET_ENV-infra-stores.env
+Vault mirror: apps/data/$FLEET_ENV/oidc/* and apps/data/$FLEET_ENV/infra/keycloak-test-users
+Never commit these files. Mode 600/700.
+EOF
+      chmod 700 "$CREDS_DIR" || true
+      echo "wrote $CREDS_DIR/README.txt"
+    BASH
+  }
+}
+
+output "cluster_name" { value = local.kind_name }
+output "api_server_port" { value = local.co_locate_on_infra ? 6443 : try(module.cluster[0].api_server_port, 6445) }
 output "auth_host" { value = module.keycloak.auth_host }
 output "argocd_host" { value = module.argocd.argocd_host }
 output "temporal_host" { value = module.temporal.ui_host }
@@ -711,3 +832,5 @@ output "argocd_admin_password" {
   sensitive = true
 }
 output "platform_node_ip" { value = local.platform_ip }
+output "co_locate_on_infra" { value = local.co_locate_on_infra }
+output "workload_kubeconfig" { value = local.workload_kubeconfig }

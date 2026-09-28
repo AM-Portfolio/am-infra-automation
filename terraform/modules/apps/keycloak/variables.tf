@@ -109,6 +109,18 @@ variable "gateway_middleware_namespace" {
   default = "infra"
 }
 
+variable "public_hostname" {
+  description = "Override public auth host (e.g. auth.asrax.in when DR is CF LB primary). Empty = auth[-env].root_domain."
+  type        = string
+  default     = ""
+}
+
+variable "also_match_env_host" {
+  description = "When public_hostname is bare, also match auth-dr (drill hosts) on the IngressRoute."
+  type        = bool
+  default     = true
+}
+
 variable "oidc_enabled" {
   type    = bool
   default = false
@@ -127,10 +139,12 @@ variable "realm_name" {
 
 variable "realm_roles" {
   type = list(string)
-  # Canonical identity roles + temporary am-* aliases for Grafana/fleet migrate
+  # Canonical IAM roles (iam-sso). developer → am-ops; user → am-user.
   default = [
-    "user", "viewer", "ops", "admin", "super_admin", "service",
-    "am-admin", "am-ops", "am-viewer", "am-user",
+    "am-admin",
+    "am-ops",
+    "am-viewer",
+    "am-user",
   ]
 }
 

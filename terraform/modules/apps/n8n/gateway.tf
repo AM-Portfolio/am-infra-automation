@@ -38,7 +38,7 @@ resource "kubectl_manifest" "ingressroute" {
         - match: Host(`${local.ui_host}`)
           kind: Rule
           services:
-            - name: n8n
+            - name: n8n-main
               port: 5678
           middlewares:
             - name: force-https-proto

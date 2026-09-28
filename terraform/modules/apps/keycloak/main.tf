@@ -27,8 +27,14 @@ terraform {
 
 locals {
   domain_suffix = var.environment == "prod" ? "" : "-${var.environment}"
-  auth_host     = "auth${local.domain_suffix}.${var.root_domain}"
-  http_port     = 8080
+  auth_host_env = "auth${local.domain_suffix}.${var.root_domain}"
+  auth_host     = var.public_hostname != "" ? var.public_hostname : local.auth_host_env
+  host_match = (
+    var.public_hostname != "" && var.also_match_env_host && local.auth_host != local.auth_host_env
+    ? "Host(`${local.auth_host}`) || Host(`${local.auth_host_env}`)"
+    : "Host(`${local.auth_host}`)"
+  )
+  http_port = 8080
 }
 
 resource "random_password" "admin" {
@@ -90,7 +96,24 @@ resource "helm_release" "keycloak" {
       { name = "KC_HOSTNAME_STRICT", value = "false" },
       { name = "KC_HTTP_ENABLED", value = "true" },
       { name = "KC_PROXY_HEADERS", value = "xforwarded" },
+      { name = "KC_METRICS_ENABLED", value = "true" },
+      { name = "KC_HEALTH_ENABLED", value = "true" },
+      # Legacy token-exchange (requested_subject / Google login impersonation) + FGAP v1
+      { name = "KC_FEATURES", value = "token-exchange,admin-fine-grained-authz:v1" },
     ]
+    metrics = {
+      enabled = true
+      service = {
+        ports = {
+          http = 8080
+        }
+      }
+    }
+    podAnnotations = {
+      "prometheus.io/scrape" = "true"
+      "prometheus.io/port"   = "8080"
+      "prometheus.io/path"   = "/metrics"
+    }
     postgresql = { enabled = false }
     externalDatabase = {
       host                      = var.db_host
@@ -132,7 +155,7 @@ resource "kubectl_manifest" "ingressroute" {
         - web
         - websecure
       routes:
-        - match: Host(`${local.auth_host}`)
+        - match: ${local.host_match}
           kind: Rule
           services:
             - name: keycloak

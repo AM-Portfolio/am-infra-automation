@@ -22,9 +22,13 @@ provider "kubectl" {
   load_config_file = true
 }
 
-# Declared because child modules still list these providers. Fleet jobs do not call them.
+# Live Vault (exposer :8200 → NodePort 30820). Required for vault/oidc.tf + MinIO optional KV.
 provider "vault" {
-  address          = "http://127.0.0.1:8200"
+  address = "http://127.0.0.1:8200"
+  token = try(
+    jsondecode(replace(file("/data/am-state/vault-prod-infra.json"), "\ufeff", "")).root_token,
+    ""
+  )
   skip_child_token = true
   skip_tls_verify  = true
 }

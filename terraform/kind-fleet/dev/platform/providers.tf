@@ -1,44 +1,51 @@
 locals {
-  env    = "dev"
-  domain = "asrax.in"
+  env                  = "dev"
+  domain               = "asrax.in"
+  co_locate_on_infra   = var.co_locate_on_infra
+  gateway_same_cluster = local.co_locate_on_infra
+  cross_cluster_routes = !local.co_locate_on_infra
+  infra_kubeconfig     = pathexpand("~/.asrax/kubeconfig.am-dev-infra.yaml")
+  infra_context        = "kind-am-dev-infra"
+  workload_kubeconfig  = local.co_locate_on_infra ? local.infra_kubeconfig : pathexpand("~/.asrax/kubeconfig.am-dev-platform.yaml")
+  workload_context     = local.co_locate_on_infra ? local.infra_context : "kind-am-dev-platform"
 }
 
-# Platform cluster (created by module.cluster in this stack).
+variable "co_locate_on_infra" {
+  description = "When true, deploy platform tools+Keycloak on am-dev-infra; do not create am-dev-platform Kind."
+  type        = bool
+  default     = false
+}
+
+# Workload cluster (infra when co-located; legacy platform Kind otherwise).
 provider "kubernetes" {
-  host                   = module.cluster.endpoint
-  client_certificate     = module.cluster.client_certificate
-  client_key             = module.cluster.client_key
-  cluster_ca_certificate = module.cluster.cluster_ca_certificate
+  config_path    = local.workload_kubeconfig
+  config_context = local.workload_context
 }
 
 provider "helm" {
   kubernetes {
-    host                   = module.cluster.endpoint
-    client_certificate     = module.cluster.client_certificate
-    client_key             = module.cluster.client_key
-    cluster_ca_certificate = module.cluster.cluster_ca_certificate
+    config_path    = local.workload_kubeconfig
+    config_context = local.workload_context
   }
 }
 
 provider "kubectl" {
-  host                   = module.cluster.endpoint
-  client_certificate     = module.cluster.client_certificate
-  client_key             = module.cluster.client_key
-  cluster_ca_certificate = module.cluster.cluster_ca_certificate
-  load_config_file       = false
+  config_path      = local.workload_kubeconfig
+  config_context   = local.workload_context
+  load_config_file = true
 }
 
 # Infra Traefik / bridges.
 provider "kubernetes" {
   alias          = "infra"
-  config_path    = pathexpand("~/.asrax/kubeconfig.am-dev-infra.yaml")
-  config_context = "kind-am-dev-infra"
+  config_path    = local.infra_kubeconfig
+  config_context = local.infra_context
 }
 
 provider "kubectl" {
   alias            = "infra"
-  config_path      = pathexpand("~/.asrax/kubeconfig.am-dev-infra.yaml")
-  config_context   = "kind-am-dev-infra"
+  config_path      = local.infra_kubeconfig
+  config_context   = local.infra_context
   load_config_file = true
 }
 
@@ -98,7 +105,7 @@ variable "redis_password" {
 }
 
 variable "platform_node_ip" {
-  description = "Docker IP of am-dev-platform-control-plane on the kind network."
+  description = "Docker IP of am-dev-platform-control-plane (legacy cross-cluster only)."
   type        = string
   default     = ""
 }

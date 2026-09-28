@@ -32,6 +32,17 @@ variable "cloudflare_account_id" {
   default   = ""
 }
 
+variable "kubeapi_kind_api_origin" {
+  description = "Additive tunnel origin for kubeapi-prod.asrax.in (Kind am-prod-apps API). Empty = omit."
+  type        = string
+  default     = "https://127.0.0.1:6443"
+}
+
+variable "enable_kubeapi_ingress" {
+  type    = bool
+  default = true
+}
+
 provider "kubernetes" {
   config_path    = "/data/am-state/kubeconfig.am-prod-infra.yaml"
   config_context = "kind-am-prod-infra"
@@ -93,6 +104,37 @@ module "edge" {
   bare_https_names = []
   # Apex company profile (same asrax-ui as asrax.asrax.in)
   extra_fqdns = ["asrax.in"]
+  # DNS for these hosts is owned by terraform/kind-fleet/prod/cloudflare-lb (DR primary / Contabo fallback).
+  # Tunnel ingress still includes them via https_names / extra_fqdns.
+  skip_dns_names = [
+    "vault",
+    "minio",
+    "s3",
+    "influx",
+    "traefik",
+    "pgadmin",
+    "mongo-express",
+    "kafka-ui",
+    "redis-ui",
+    "auth",
+    "argocd",
+    "temporal",
+    "lago",
+    "n8n",
+    "growthbook",
+    "openproject",
+    "litellm",
+    "langfuse",
+    "novu",
+    "am",
+    "corp",
+    "asrax",
+    "asrax.in",
+  ]
+  # Additive Kind API hostname (DNS owned by kind-fleet/prod/argo-kubeapi).
+  extra_origin_ingress = var.enable_kubeapi_ingress && var.kubeapi_kind_api_origin != "" ? {
+    "kubeapi-prod.asrax.in" = var.kubeapi_kind_api_origin
+  } : {}
 }
 
 output "traefik_origin" { value = module.edge.traefik_origin }

@@ -11,9 +11,15 @@ module "contracts" {
 }
 
 locals {
-  host_suffix    = var.environment == "prod" ? "" : "-${var.environment}"
-  https_fqdn     = module.contracts.https_fqdn
-  record_name    = module.contracts.record_name
+  host_suffix = var.environment == "prod" ? "" : "-${var.environment}"
+  https_fqdn = merge(
+    module.contracts.https_fqdn,
+    { for f in var.tunnel_only_fqdns : "tunnel-only:${f}" => f }
+  )
+  record_name = {
+    for k, v in module.contracts.record_name : k => v
+    if !contains(var.skip_dns_names, k) && !contains(var.skip_dns_names, v)
+  }
   traefik_origin = "http://traefik.${var.namespace}.svc.cluster.local:80"
   tunnel_cname   = "${var.tunnel_id}.cfargotunnel.com"
 }
@@ -73,6 +79,7 @@ resource "kubectl_manifest" "middleware_force_https_proto" {
       headers:
         customRequestHeaders:
           X-Forwarded-Proto: https
+          X-Forwarded-Port: "443"
   YAML
 
   depends_on = [helm_release.traefik]

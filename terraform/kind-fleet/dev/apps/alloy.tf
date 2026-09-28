@@ -10,10 +10,13 @@ locals {
 module "alloy_logs" {
   source = "../../../modules/core/alloy-logs"
 
-  namespace                   = "monitoring"
-  cluster_name               = module.cluster.cluster_name
-  environment                = local.env
-  loki_push_url              = local.loki_push_url
+  namespace                    = "monitoring"
+  cluster_name                = module.cluster.cluster_name
+  environment                 = local.env
+  vps                         = "vps-dev"
+  vps_name                    = "VPS_DEV"
+  vps_ip                      = "laptop"
+  loki_push_url               = local.loki_push_url
   prometheus_remote_write_url = local.prometheus_remote_write_url
 
   depends_on = [

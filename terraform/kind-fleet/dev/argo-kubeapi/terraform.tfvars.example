@@ -1,0 +1,8 @@
+tunnel_id              = "" # asrax-dev tunnel UUID
+cloudflare_api_token   = ""
+cloudflare_account_id  = ""
+manage_dns             = true
+enable_argo_patch      = false
+# argo_kubeconfig      = "/data/am-state/kubeconfig.contabo-argo.yaml"
+# argo_kube_context    = ""
+# kind_api_origin      = "https://host.docker.internal:6444"

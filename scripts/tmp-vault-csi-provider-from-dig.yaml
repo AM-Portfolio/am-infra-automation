@@ -1,0 +1,254 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app.kubernetes.io/instance: vault-csi-provider
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault-csi-provider
+  name: vault-csi-provider-csi-provider
+  namespace: kube-system
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: vault-csi-provider
+      app.kubernetes.io/name: vault-csi-provider
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/instance: vault-csi-provider
+        app.kubernetes.io/name: vault-csi-provider
+    spec:
+      containers:
+      - args:
+        - --endpoint=/provider/vault.sock
+        - --log-level=info
+        - --hmac-secret-name=vault-csi-provider-hmac-key
+        env:
+        - name: VAULT_ADDR
+          value: unix:///var/run/vault/agent.sock
+        image: hashicorp/vault-csi-provider:1.7.4
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: vault-csi-provider
+        readinessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /provider
+          name: providervol
+        - mountPath: /var/run/vault
+          name: agent-unix-socket
+      - args:
+        - agent
+        - -config=/etc/vault/config.hcl
+        command:
+        - vault
+        env:
+        - name: VAULT_LOG_LEVEL
+          value: info
+        - name: VAULT_LOG_FORMAT
+          value: standard
+        image: hashicorp/vault:2.0.4
+        imagePullPolicy: IfNotPresent
+        name: vault-agent
+        ports:
+        - containerPort: 8200
+          protocol: TCP
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 100
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/vault/config.hcl
+          name: agent-config
+          readOnly: true
+          subPath: config.hcl
+        - mountPath: /var/run/vault
+          name: agent-unix-socket
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: vault-csi-provider-csi-provider
+      serviceAccountName: vault-csi-provider-csi-provider
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /var/run/secrets-store-csi-providers
+          type: ''
+        name: providervol
+      - configMap:
+          defaultMode: 420
+          name: vault-csi-provider-csi-provider-agent-config
+        name: agent-config
+      - emptyDir:
+          medium: Memory
+        name: agent-unix-socket
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: vault-csi-provider
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault
+    helm.sh/chart: vault-0.34.1
+  name: vault-csi-provider
+  namespace: kube-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: vault-csi-provider
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault-csi-provider
+  name: vault-csi-provider-csi-provider
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/instance: vault-csi-provider
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault-csi-provider
+  name: vault-csi-provider-csi-provider-role
+  namespace: kube-system
+rules:
+- apiGroups:
+  - ''
+  resourceNames:
+  - vault-csi-provider-hmac-key
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
+  - ''
+  resources:
+  - secrets
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: vault-csi-provider
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault-csi-provider
+  name: vault-csi-provider-csi-provider-rolebinding
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vault-csi-provider-csi-provider-role
+subjects:
+- kind: ServiceAccount
+  name: vault-csi-provider-csi-provider
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/instance: vault-csi-provider
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault-csi-provider
+  name: vault-csi-provider-csi-provider-clusterrole
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - serviceaccounts/token
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: vault-csi-provider
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault-csi-provider
+  name: vault-csi-provider-csi-provider-clusterrolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vault-csi-provider-csi-provider-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: vault-csi-provider-csi-provider
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: vault-csi-provider
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault
+    helm.sh/chart: vault-0.34.1
+  name: vault-csi-provider-server-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: vault-csi-provider
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: vault-csi-provider
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: vault
+    helm.sh/chart: vault-0.34.1
+  name: vault-csi-provider-server-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: vault-csi-provider
+  namespace: kube-system

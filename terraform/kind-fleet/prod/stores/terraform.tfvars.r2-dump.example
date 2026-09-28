@@ -1,0 +1,9 @@
+# Copy to stores WD as r2-dump.auto.tfvars on VPS1 (not git).
+# Prefer Global API Key + email for R2 object writes (Bearer tokens are often list-only).
+
+enable_r2_dump                  = true
+r2_dump_cloudflare_account_id   = "23061f216225f4e2921ba51c2801874d"
+r2_dump_cloudflare_email        = "you@example.com"
+r2_dump_cloudflare_api_key      = "REPLACE_WITH_GLOBAL_API_KEY"
+# optional list-capable Bearer:
+# r2_dump_cloudflare_api_token  = "REPLACE_WITH_CF_API_TOKEN"

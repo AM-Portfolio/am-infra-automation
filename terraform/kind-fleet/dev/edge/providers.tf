@@ -75,3 +75,15 @@ variable "break_glass_emails" {
   type    = list(string)
   default = []
 }
+
+variable "kubeapi_kind_api_origin" {
+  description = "Additive tunnel origin for kubeapi-dev.asrax.in (Kind am-dev-apps API). Empty = omit rule."
+  type        = string
+  default     = "https://host.docker.internal:6444"
+}
+
+variable "enable_kubeapi_ingress" {
+  description = "When true, merge kubeapi-dev.asrax.in → kubeapi_kind_api_origin into edge tunnel ingress."
+  type        = bool
+  default     = true
+}

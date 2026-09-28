@@ -472,7 +472,10 @@ def gate_4g_remaining(cfg: dict[str, str]) -> None:
             continue
         if code != 200:
             alts = {
-                "parser": ["/market/parser/actuator/health"],
+                "parser": [
+                    "/parser/health",
+                    "/market/parser/actuator/health",
+                ],
                 "logging": ["/logging/health"],
                 "notification": [
                     "/notifications/actuator/health",

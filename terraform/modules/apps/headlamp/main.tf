@@ -1,8 +1,12 @@
 # ==============================================================================
-# Headlamp — Kubernetes UI
+# Headlamp — Kubernetes UI (Keycloak OIDC)
 # ==============================================================================
-# Deploys Headlamp with OIDC integration (Authentik) and ClusterAdmin RBAC.
+# Fleet iam-sso Phase 2: enable OIDC when issuer_url + client id/secret set.
 # ==============================================================================
+
+locals {
+  oidc_enabled = var.issuer_url != "" && var.oidc_client_id != "" && var.oidc_client_secret != ""
+}
 
 resource "helm_release" "headlamp" {
   name       = "headlamp"
@@ -16,8 +20,12 @@ resource "helm_release" "headlamp" {
       tag = "v0.41.0"
     }
     config = {
-      # OIDC disabled for now to unblock access
-      oidc = {
+      oidc = local.oidc_enabled ? {
+        clientID     = var.oidc_client_id
+        clientSecret = var.oidc_client_secret
+        issuerURL    = var.issuer_url
+        scopes       = "openid profile email roles groups"
+      } : {
         clientID     = ""
         clientSecret = ""
         issuerURL    = ""
@@ -31,10 +39,8 @@ resource "helm_release" "headlamp" {
       create          = true
       clusterRoleName = "cluster-admin"
     }
-
-    # 🔄 Automated Rollout
     podAnnotations = {
-      "checksum/config" = "disabled-oidc"
+      "checksum/oidc" = local.oidc_enabled ? sha256("${var.issuer_url}:${var.oidc_client_id}") : "disabled-oidc"
     }
   })]
 
@@ -43,7 +49,6 @@ resource "helm_release" "headlamp" {
   }
 }
 
-# ── Dynamic Token for UI ─────────────────────────────────────────────────────
 resource "kubernetes_secret" "headlamp_token" {
   metadata {
     name      = "headlamp-token"
@@ -56,4 +61,3 @@ resource "kubernetes_secret" "headlamp_token" {
 
   depends_on = [helm_release.headlamp]
 }
-

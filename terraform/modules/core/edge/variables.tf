@@ -60,6 +60,30 @@ variable "extra_fqdns" {
   default     = []
 }
 
+variable "tunnel_only_fqdns" {
+  description = "Full FQDNs added to tunnel ingress only (no DNS). Used so DR can answer bare prod Host headers behind Cloudflare LB while *-dr DNS stays direct."
+  type        = list(string)
+  default     = []
+}
+
+variable "skip_dns_names" {
+  description = "Keys from record_name that must not create cloudflare_record (LB owns those bare hostnames)."
+  type        = list(string)
+  default     = []
+}
+
+variable "extra_origin_ingress" {
+  description = <<-EOT
+    Additive map of full FQDN → origin URL for tunnel ingress (non-Traefik).
+    Used by argo-kubeapi-patch consumers so kubeapi-*.asrax.in reaches Kind apiserver
+    without replacing existing Traefik rules. Example:
+      { "kubeapi-dev.asrax.in" = "https://host.docker.internal:6444" }
+    DNS for these hosts is owned by modules/ops/argo-kubeapi-patch (not this map).
+  EOT
+  type        = map(string)
+  default     = {}
+}
+
 variable "traefik_chart_version" {
   type    = string
   default = "27.0.2"

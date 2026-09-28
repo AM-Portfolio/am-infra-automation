@@ -75,8 +75,12 @@ resource "helm_release" "temporal" {
     mysql         = { enabled = false }
     postgresql    = { enabled = false }
     elasticsearch = { enabled = false }
-    prometheus    = { enabled = false }
-    grafana       = { enabled = false }
+    # Native Temporal metrics for Alloy annotated scrape (Platform / Temporal)
+    prometheus = {
+      enabled = true
+      scrapeAnnotations = true
+    }
+    grafana = { enabled = false }
     schema = {
       createDatabase = { enabled = false }
       setup          = { enabled = true }

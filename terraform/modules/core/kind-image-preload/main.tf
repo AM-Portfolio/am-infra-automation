@@ -34,7 +34,7 @@ resource "terraform_data" "crictl_pull" {
   }
 
   provisioner "local-exec" {
-    interpreter = ["/bin/bash", "-c"]
+    interpreter = ["bash", "-c"]
     environment = {
       KIND_NODE  = local.node_name
       IMAGES_CSV = local.images_csv

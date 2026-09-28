@@ -3,7 +3,8 @@
 **Checkbox SoT for DR:** [`dr/`](dr/) (unchecked until executed).  
 **Agent playbook:** skill **`am-kind-fleet`** (`amctl/ai-catalog/skills/platform/am-kind-fleet/`).  
 **Historical multi-env pack:** [TODO.md](TODO.md) (do not wipe).  
-**Prod track:** [PROD_DEPLOY.md](PROD_DEPLOY.md) · [`prod/`](prod/).
+**Prod track:** [PROD_DEPLOY.md](PROD_DEPLOY.md) · [`prod/`](prod/).  
+**Target delta (1 Kind DR, R2 slave, same-domain CF cutover):** [`identity-infra-split/`](identity-infra-split/) — especially [phase-6.md](identity-infra-split/phase-6.md) + [FAILOVER.md](identity-infra-split/FAILOVER.md). Do not rewrite finished `dr/` history boxes; new target lives in the delta track.
 
 Docs + code scaffolding first. No terraform/Kind/CF LB mutate until you confirm Execute on VPS3.
 
@@ -13,7 +14,8 @@ Docs + code scaffolding first. No terraform/Kind/CF LB mutate until you confirm 
 |------|--------|
 | Host | VPS3 (`VPS_3_IP` from `VPS/.env`) |
 | Env token | `dr` |
-| Clusters | `am-dr-infra` :6443 · `am-dr-apps` :6444 · `am-dr-platform` :6445 |
+| Clusters (historical stand-up) | `am-dr-infra` :6443 · `am-dr-apps` :6444 · `am-dr-platform` :6445 |
+| **Target (identity-infra-split)** | **1** Kind — DBs + platform NS via R2 auto-sync; public cutover = services on **same** prod domains (no `*-dr` DB/platform DNS) |
 | Kind nodes | **All `one`** — three names `am-dr-{infra,apps,platform}` |
 | TF state | `/data/am-state/terraform/dr/` on **VPS3 only** |
 | Day-2 | `am-ops` / `am-vps3-ops` · Kind create/stop = G1 |
@@ -59,7 +61,7 @@ Detail: [dr/README.md](dr/README.md) · [dr/SIZING.md](dr/SIZING.md).
 ## Not in this pack (pointers)
 
 - Phase 7 promote / fence VPS1 · Phase 8 rebuild VPS1 · Phase 9 failback · Phase 12 drill — [TODO.md](TODO.md) / skill `reference/phase-6-12.md`
-- VPS2 obs: Phase 11 · `OBS_VPS2_SIZING.md`
+- VPS2 obs: Phase 11 · [OBS_DEPLOY.md](OBS_DEPLOY.md) · [`obs/`](obs/) · [OBS_VPS2_SIZING.md](OBS_VPS2_SIZING.md)
 
 ## Refuse
 

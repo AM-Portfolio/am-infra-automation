@@ -68,18 +68,27 @@ Overall: **8.6 / 10**. Unplanned VPS1 death ~8.5 if replica lag is seconds. Scal
 
 ---
 
-## G20 — Postgres primary/standby + Mongo replica
+## G20 — Postgres / Mongo (DR preferred writer)
+
+**Steady state:** VPS3 (DR) = PG primary + Mongo primary (or preferred writer). Contabo = standby/secondary over WireGuard.
+
+**On DR failure:** CF LB → Contabo HTTPS; promote Contabo PG/Mongo; fence DR; set `dr_pool_enabled=false`.
+
+**Restore DR:** catch up, promote DR, demote Contabo, set `dr_pool_enabled=true`.
+
+- One writer. After failover to Contabo: `pg_ctl promote` + `rs.stepUp` on VPS1.
+- After restore: Contabo returns as **new standby / secondary** and catches up. Human then sets CF DR pool enabled again.
 
 ```text
-VPS1 PG  PRIMARY   --WAL / WireGuard-->  VPS3 PG  STANDBY
-VPS1 Mongo PRIMARY --oplog / WireGuard-->  VPS3 Mongo SECONDARY
+VPS3 PG  PRIMARY   --WAL / WireGuard-->  VPS1 PG  STANDBY
+VPS3 Mongo PRIMARY --oplog / WireGuard-->  VPS1 Mongo SECONDARY
 ```
 
 - Private link only (WireGuard or tailscale). **Do not** publish `:5432` / `:27017` on the public internet.
 - Apps on each host still use `127.0.0.1` (G4). Replication bind = WG address.
-- One writer. After failover: `pg_ctl promote` + `rs.stepUp` on VPS3 (G1 allowlist).
-- VPS1 returns as **new standby / secondary** and catches up. Human then sets CF primary back.
-- Keycloak + Temporal + app DBs are on that one Postgres, so a login 2 seconds ago is on VPS3.
+- One writer. After fall-to-Contabo: `pg_ctl promote` + `rs.stepUp` on VPS1 (G1 allowlist).
+- After restore-to-DR: Contabo returns as **new standby / secondary**. Human sets `dr_pool_enabled=true`.
+- Keycloak + Temporal + app DBs are on that one Postgres, so a login 2 seconds ago is on the standby.
 - Positions/orders: Mongo secondary is live (seconds), not a 5 min dump.
 
 **R2:** daily (or on-demand) dump from the **current primary** for “both boxes dead.” Never apply that dump onto a running replica.
@@ -92,9 +101,9 @@ Allowlist root: `kind create|delete`, `docker stop|start` Kind nodes, `systemctl
 
 ### G2 / G7 — Failover
 
-Unplanned: host dead → no VPS1 writers; CF health fails; promote VPS3 if standby is still read-only.  
-Planned: stop VPS1 Kind → promote VPS3 → CF already failing over.  
-Grey (sick but writing): stop VPS1 Kind first, then promote.
+Unplanned: DR host dead → no VPS3 writers; CF health fails → Contabo; promote Contabo if still read-only.  
+Planned: stop VPS3 Kind → promote Contabo → CF already failing over (or interim CNAME).  
+Grey (sick but writing): stop DR Kind first, then promote Contabo; set `dr_pool_enabled=false`.
 
 ### G15 — JWT
 

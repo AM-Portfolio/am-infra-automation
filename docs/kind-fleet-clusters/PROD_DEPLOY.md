@@ -54,7 +54,10 @@ Checkbox SoT: `prod/phase-*.md`. Mark boxes as you go. Sizing: always `environme
 
 ## Not in this pack (pointers)
 
-- DR / failback: TODO Phases 6–9 · skill `reference/phase-6-12.md`
+- **Identity / infra split + Kind target** ([`identity-infra-split/`](identity-infra-split/)): Contabo **2** Kind + **1** DB stack (platform NS on infra); DR **1** Kind R2 slave; nonprod **1** Kind; [FAILOVER.md](identity-infra-split/FAILOVER.md) — do not rewrite finished prod Phase 1–4 boxes
+- Target clusters (delta): `am-prod-infra` + `am-prod-apps` only — retire `am-prod-platform` via identity-infra-split Phase 2
+- DR warm / CF services cutover: [DR_DEPLOY.md](DR_DEPLOY.md) · [`dr/`](dr/) history + [identity-infra-split/phase-6.md](identity-infra-split/phase-6.md)
+- DR / failback (promote+failback): TODO Phases 7–9 · skill `reference/phase-6-12.md`
 - VPS2 obs: Phase 11 · `OBS_VPS2_SIZING.md`
 - Failover drill: Phase 12
 

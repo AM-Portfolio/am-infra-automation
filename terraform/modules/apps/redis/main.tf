@@ -76,6 +76,11 @@ resource "kubernetes_stateful_set" "redis" {
     template {
       metadata {
         labels = { app = "redis" }
+        annotations = {
+          "prometheus.io/scrape" = "true"
+          "prometheus.io/port"   = "9121"
+          "prometheus.io/path"   = "/metrics"
+        }
       }
       spec {
         node_selector = {
@@ -97,6 +102,23 @@ resource "kubernetes_stateful_set" "redis" {
           resources {
             requests = { memory = var.memory_request, cpu = var.cpu_request }
             limits   = { memory = var.memory_limit, cpu = var.cpu_limit }
+          }
+        }
+        container {
+          name  = "redis-exporter"
+          image = "oliver006/redis_exporter:v1.66.0"
+          port { container_port = 9121 }
+          env {
+            name  = "REDIS_ADDR"
+            value = "redis://127.0.0.1:6379"
+          }
+          env {
+            name  = "REDIS_PASSWORD"
+            value = var.redis_password
+          }
+          resources {
+            requests = { memory = "32Mi", cpu = "10m" }
+            limits   = { memory = "64Mi", cpu = "100m" }
           }
         }
         volume {

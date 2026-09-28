@@ -42,6 +42,11 @@ resource "helm_release" "influxdb" {
     annotations = {
       "helm.sh/resource-policy" = "keep"
     }
+    podAnnotations = {
+      "prometheus.io/scrape" = "true"
+      "prometheus.io/port"   = "8086"
+      "prometheus.io/path"   = "/metrics"
+    }
   })]
 
   wait = true

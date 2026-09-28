@@ -1,0 +1,7 @@
+tunnel_id             = "" # asrax-dr tunnel
+cloudflare_api_token  = ""
+cloudflare_account_id = ""
+manage_dns            = true
+enable_argo_patch     = false
+# argo_kubeconfig     = "/data/am-state/kubeconfig.am-dr-infra.yaml"
+# kind_api_origin     = "https://127.0.0.1:6443"

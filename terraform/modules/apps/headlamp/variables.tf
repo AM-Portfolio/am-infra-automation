@@ -22,7 +22,7 @@ variable "oidc_client_secret" {
   default     = ""
 }
 variable "issuer_url" {
-  description = "OIDC Issuer URL (Authentik)"
+  description = "OIDC Issuer URL (Keycloak am-realm, e.g. https://auth.asrax.in/realms/am-realm)"
   type        = string
   default     = ""
 }

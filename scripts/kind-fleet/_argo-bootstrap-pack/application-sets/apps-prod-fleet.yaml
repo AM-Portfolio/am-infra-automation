@@ -1,0 +1,234 @@
+# Prod fleet ApplicationSet — all universal-chart {kind} (excl. n8n).
+# imageValues tracks feat/gitops-applicationset-dry until merge to main.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: am-apps-prod-fleet
+  namespace: argocd
+  annotations:
+    am.asrax.in/managed-by: application-set
+    am.asrax.in/fleet: prod
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-gateway
+            valuesRepo: https://github.com/AM-Portfolio/am-core-services.git
+            valuesRev: master
+            valuesPath: services/am-gateway/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-identity
+            valuesRepo: https://github.com/AM-Portfolio/am-platform.git
+            valuesRev: main
+            valuesPath: am-identity/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-analysis
+            valuesRepo: https://github.com/AM-Portfolio/am-core-services.git
+            valuesRev: master
+            valuesPath: services/am-analysis/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-api-gateway
+            valuesRepo: https://github.com/AM-Portfolio/am-gateways.git
+            valuesRev: main
+            valuesPath: api-gateway/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-asrax-corp
+            valuesRepo: https://github.com/AM-Portfolio/am-corp-docs.git
+            valuesRev: main
+            valuesPath: helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-asrax-proxy
+            valuesRepo: https://github.com/AM-Portfolio/am-asrax-proxy.git
+            valuesRev: main
+            valuesPath: helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-cloudinary-manager
+            valuesRepo: https://github.com/AM-Portfolio/am-doc-intelligence.git
+            valuesRev: main
+            valuesPath: services/am-cloudinary-manager/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-document-processor
+            valuesRepo: https://github.com/AM-Portfolio/am-doc-intelligence.git
+            valuesRev: main
+            valuesPath: services/am-document-processor/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-email-extractor
+            valuesRepo: https://github.com/AM-Portfolio/am-doc-intelligence.git
+            valuesRev: main
+            valuesPath: services/am-email-extractor/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-logging
+            valuesRepo: https://github.com/AM-Portfolio/am-logging.git
+            valuesRev: main
+            valuesPath: helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-market-data
+            valuesRepo: https://github.com/AM-Portfolio/am-market.git
+            valuesRev: main
+            valuesPath: am-market-data/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-modern-ui
+            valuesRepo: https://github.com/AM-Portfolio/am-modern-ui.git
+            valuesRev: main
+            valuesPath: am_app/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-news
+            valuesRepo: https://github.com/AM-Portfolio/am-market.git
+            valuesRev: main
+            valuesPath: am-news/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-notification
+            valuesRepo: https://github.com/AM-Portfolio/am-platform.git
+            valuesRev: main
+            valuesPath: am-notification/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-oms
+            valuesRepo: https://github.com/AM-Portfolio/am-trade-management.git
+            valuesRev: main
+            valuesPath: am-oms/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-parser
+            valuesRepo: https://github.com/AM-Portfolio/am-market.git
+            valuesRev: main
+            valuesPath: am-parser/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-portfolio
+            valuesRepo: https://github.com/AM-Portfolio/am-portfolio.git
+            valuesRev: main
+            valuesPath: helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-subscription
+            valuesRepo: https://github.com/AM-Portfolio/am-platform.git
+            valuesRev: main
+            valuesPath: am-subscription/helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-trade-management-service
+            valuesRepo: https://github.com/AM-Portfolio/am-trade-management.git
+            valuesRev: main
+            valuesPath: helm
+          - env: prod
+            project: am-prod
+            destName: am-prod-apps
+            destNamespace: am-apps-prod
+            service: am-user-platform
+            valuesRepo: https://github.com/AM-Portfolio/am-platform.git
+            valuesRev: main
+            valuesPath: am-user-platform/helm
+  template:
+    metadata:
+      name: '{{.service}}-{{.env}}'
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+      annotations:
+        am.asrax.in/env: '{{.env}}'
+        am.asrax.in/managed-by: application-set
+        am.asrax.in/kind: apps
+        am.asrax.in/fleet: prod
+      labels:
+        am.asrax.in/env: '{{.env}}'
+        am.asrax.in/kind: apps
+        am.asrax.in/fleet: prod
+    spec:
+      project: '{{.project}}'
+      sources:
+        - repoURL: https://github.com/AM-Portfolio/am-pipelines.git
+          targetRevision: main
+          path: helm/universal-chart
+          helm:
+            releaseName: '{{.service}}-{{.env}}'
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - '{{`$imageValues`}}/overlays/{{.env}}/hostaliases-kind-fleet-vps.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/hostaliases-kind-local.yaml'
+              - '{{`$values`}}/{{.valuesPath}}/values.yaml'
+              - '{{`$values`}}/{{.valuesPath}}/vault-mappings.yaml'
+              - '{{`$values`}}/{{.valuesPath}}/values.{{.env}}.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/fleet-common.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/vault-https-preprod.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/otel.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/spring-slow-start.yaml'
+              - '{{`$imageValues`}}/overlays/common/spring-slow-start.yaml'
+              - '{{`$imageValues`}}/overlays/{{.env}}/extra-{{.service}}.yaml'
+              - '{{`$imageValues`}}/overlays/common/extra-{{.service}}.yaml'
+              - '{{`$values`}}/{{.valuesPath}}/ci-image.yaml'
+              # Prod fleet: image-tags last so accidental ci-image on values main cannot override pins.
+              - '{{`$imageValues`}}/{{.env}}/image-tags/{{.service}}.yaml'
+        - repoURL: '{{.valuesRepo}}'
+          targetRevision: '{{.valuesRev}}'
+          ref: values
+        - repoURL: https://github.com/AM-Portfolio/am-gitops.git
+          targetRevision: main
+          ref: imageValues
+      destination:
+        name: '{{.destName}}'
+        namespace: '{{.destNamespace}}'
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=false
+          - RespectIgnoreDifferences=true
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas

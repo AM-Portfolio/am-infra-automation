@@ -51,16 +51,18 @@ Skill: `phase-4-apps.md` (waves) · tests [`tests/phase-4.md`](tests/phase-4.md)
 
 ### 5f — Portfolio / trade / doc
 
-- [ ] Sync: portfolio → trade → doc → news/analysis via Argo only (gitops extras if CSI/ingress gaps — mirror prod overlays).
-- [ ] Gate: `phase_gates --env dr --wave 4f` → PASS.
+- [x] Sync: portfolio → trade → doc → news/analysis via Argo only (gitops extras if CSI/ingress gaps — mirror prod overlays).
+- [x] Gate: `phase_gates --env dr --wave 4f` → **PASS** (trade: gitops [#18](https://github.com/AM-Portfolio/am-gitops/pull/18) `AM_TRADE_CACHE_ENABLED`).
 
 **Operator path (locked):** gitops/TF PR → `argocd app sync` → `phase_gates`. AppSets load `values.prod.yaml` after `values.dr.yaml` (missing OK). **Refuse** new `dr-phase*.sh`.
 
 ### 5g — Remaining + agents
 
-- [ ] Sync remaining apps + agents (batched); Postman / domain closout.
-- [ ] Spot-check: no Vault sidecar; CSI remounts OK after extras.
-- [ ] Gate: `phase_gates --env dr --wave 4g` → PASS.
+- [x] Sync remaining apps + agents (batched); Postman / domain closout.
+- [x] Spot-check: no Vault sidecar; CSI remounts OK after extras (MCP: gitops [#19](https://github.com/AM-Portfolio/am-gitops/pull/19)).
+- [x] Gate: `phase_gates --env dr --wave 4g` → **PASS**.
+
+Note: single-node Kind is memory-tight — non-gate agents may stay scaled to 0 until G20 capacity.
 
 ## Test — app / API host matrix
 
@@ -77,7 +79,7 @@ Skill: `phase-4-apps.md` (waves) · tests [`tests/phase-4.md`](tests/phase-4.md)
 ### Checks
 
 - [ ] After each wave: pods Ready in `am-apps-dr` / `am-agents-dr`.
-- [x] **5d** + **5e** gates green; **5g** closout still open.
+- [x] **5d** + **5e** + **5f** + **5g** gates green.
 - [ ] Isolation: **no** `am-apps-prod` on VPS3.
 - [ ] Access still off through all waves.
 - [ ] Image pins not `latest`.

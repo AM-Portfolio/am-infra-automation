@@ -7,15 +7,24 @@
 #   terraform -chdir=prod/vault-apps init -backend-config=backend.hcl
 #   terraform -chdir=prod/vault-apps apply
 #
-# Requires platform-written /data/am-state/credentials/prod-keycloak-admin.env
+# Requires platform-written /data/am-state/credentials/prod/keycloak-admin.env
+# (compat symlink: prod-keycloak-admin.env)
 
 locals {
   env    = "prod"
   domain = "asrax.in"
 
   vault_keys_file = "/data/am-state/vault-prod-infra.json"
-  stores_env_file = "/data/am-state/credentials/prod-infra-stores.env"
-  kc_env_file     = "/data/am-state/credentials/prod-keycloak-admin.env"
+  stores_env_file = (
+    fileexists("/data/am-state/credentials/prod/infra-stores.env")
+    ? "/data/am-state/credentials/prod/infra-stores.env"
+    : "/data/am-state/credentials/prod-infra-stores.env"
+  )
+  kc_env_file = (
+    fileexists("/data/am-state/credentials/prod/keycloak-admin.env")
+    ? "/data/am-state/credentials/prod/keycloak-admin.env"
+    : "/data/am-state/credentials/prod-keycloak-admin.env"
+  )
 
   vault_addr  = "https://vault.${local.domain}"
   vault_token = jsondecode(replace(file(local.vault_keys_file), "\ufeff", "")).root_token
@@ -64,7 +73,7 @@ resource "terraform_data" "require_kc_admin_env" {
   lifecycle {
     precondition {
       condition     = fileexists(local.kc_env_file) && length(try(local.kc["KEYCLOAK_ADMIN_PASSWORD"], "")) >= 8
-      error_message = "Missing ${local.kc_env_file} with KEYCLOAK_ADMIN_PASSWORD — re-apply kind-fleet/prod/platform (writes credentials/prod-keycloak-admin.env)."
+      error_message = "Missing ${local.kc_env_file} with KEYCLOAK_ADMIN_PASSWORD — re-apply kind-fleet/prod/platform (writes credentials/prod/keycloak-admin.env)."
     }
   }
 }

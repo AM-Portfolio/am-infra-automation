@@ -1,0 +1,6 @@
+# Copy to dr/stores WD as r2-pull.auto.tfvars on VPS3 (not git).
+
+enable_r2_pull                  = true
+r2_pull_cloudflare_account_id   = "23061f216225f4e2921ba51c2801874d"
+r2_pull_cloudflare_email        = "you@example.com"
+r2_pull_cloudflare_api_key      = "REPLACE_WITH_GLOBAL_API_KEY"

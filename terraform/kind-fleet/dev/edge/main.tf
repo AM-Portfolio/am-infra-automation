@@ -50,6 +50,10 @@ module "edge" {
     "loki",
     "prometheus",
   ]
+  # Additive Kind API hostname (DNS owned by kind-fleet/dev/argo-kubeapi).
+  extra_origin_ingress = var.enable_kubeapi_ingress && var.kubeapi_kind_api_origin != "" ? {
+    "kubeapi-dev.asrax.in" = var.kubeapi_kind_api_origin
+  } : {}
 }
 
 # Zero-trust Access + data-plane CIDR list. access_enforce=false until ZT-P1 (enroll first).

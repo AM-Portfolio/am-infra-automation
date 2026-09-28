@@ -18,7 +18,10 @@ locals {
   cluster_ca_raw = module.cluster.cluster_ca_certificate
   cluster_ca_pem = strcontains(local.cluster_ca_raw, "BEGIN CERTIFICATE") ? local.cluster_ca_raw : base64decode(local.cluster_ca_raw)
 
-  apps_api_host = "https://${data.external.apps_cp_ip.result.ip}:6443"
+  # Prefer Kind docker DNS (stable across IP churn). Vault on infra resolves
+  # am-prod-apps-control-plane on the shared docker network. IP fallback kept
+  # for apply-time validation via data.external.apps_cp_ip.
+  apps_api_host = "https://am-prod-apps-control-plane:6443"
 }
 
 data "external" "ghcr_docker_cred" {

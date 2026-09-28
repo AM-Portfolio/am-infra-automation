@@ -119,6 +119,12 @@ variable "enable_gateway" {
   default     = false
 }
 
+variable "also_match_bare" {
+  description = "When true (DR behind CF LB), IngressRoute also matches vault.root_domain."
+  type        = bool
+  default     = false
+}
+
 variable "cpu_request" {
   type    = string
   default = "50m"

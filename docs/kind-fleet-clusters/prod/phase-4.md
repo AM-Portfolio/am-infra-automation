@@ -4,7 +4,7 @@ Skill: `phase-4-apps.md` · tests [`tests/phase-4.md`](tests/phase-4.md).
 
 **Gates (no tmp scripts):** `PYTHONPATH=scripts/kind-fleet python -m phase_gates --env prod --wave 4d`
 
-**Seed coupling:** `vault-apps` requires `/data/am-state/credentials/prod-keycloak-admin.env` written by platform apply (never fleet placeholders for `KEYCLOAK_ADMIN_PASSWORD`).
+**Seed coupling:** `vault-apps` requires `/data/am-state/credentials/prod/keycloak-admin.env` (compat symlink `prod-keycloak-admin.env`) written by platform apply (never fleet placeholders for `KEYCLOAK_ADMIN_PASSWORD`).
 
 ## Prereq
 

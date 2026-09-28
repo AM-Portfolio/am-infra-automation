@@ -1,12 +1,24 @@
 locals {
   # Host naming: prod uses bare Phase-2/3 names; others use -<env> suffix.
   # Auth = Keycloak public host (auth*.asrax.in). Quarkus KC has no /auth context path.
+  # Contabo dig (env=dev + store_hosts=contabo_prod): Vault paths stay apps/data/dev/*,
+  # but PG/Mongo/Redis/Kafka/Influx hit Contabo prod stores — there is no dig store plane.
   host_suffix = var.env == "prod" ? "" : "-${var.env}"
-  pg_host     = "postgres${local.host_suffix}.${var.domain}"
-  mongo_host  = var.env == "prod" ? "mongo.${var.domain}" : "mongodb-${var.env}.${var.domain}"
-  redis_host  = "redis${local.host_suffix}.${var.domain}"
-  kafka_host  = "kafka${local.host_suffix}.${var.domain}:9092"
-  influx_host = var.env == "prod" ? "influx.${var.domain}" : "influxdb-${var.env}.${var.domain}"
+  use_contabo_prod_stores = var.store_hosts == "contabo_prod"
+
+  pg_host = local.use_contabo_prod_stores ? "postgres.${var.domain}" : "postgres${local.host_suffix}.${var.domain}"
+  mongo_host = (
+    local.use_contabo_prod_stores ? "mongo.${var.domain}" :
+    (var.env == "prod" ? "mongo.${var.domain}" : "mongodb-${var.env}.${var.domain}")
+  )
+  redis_host = local.use_contabo_prod_stores ? "redis.${var.domain}" : "redis${local.host_suffix}.${var.domain}"
+  kafka_host = (
+    local.use_contabo_prod_stores ? "kafka.${var.domain}:9092" : "kafka${local.host_suffix}.${var.domain}:9092"
+  )
+  influx_host = (
+    local.use_contabo_prod_stores ? "influxdb.${var.domain}" :
+    (var.env == "prod" ? "influx.${var.domain}" : "influxdb-${var.env}.${var.domain}")
+  )
   auth_host   = var.env == "prod" ? "auth.${var.domain}" : "auth-${var.env}.${var.domain}"
   kc_host     = "https://${local.auth_host}"
   ui_base = coalesce(
@@ -14,6 +26,18 @@ locals {
     var.env == "prod" ? "https://am.${var.domain}" : "https://am-${var.env}.${var.domain}"
   )
   otel_host = "https://otel${local.host_suffix}.${var.domain}"
+
+  # Per-DB app users (never one shared admin for app traffic). Dig Contabo uses *_dev names
+  # on Contabo prod stores; passwords are unique per DB (not the cluster admin password).
+  db_user_suffix = var.env == "prod" ? "" : "_${var.env}"
+  pg_user_platform     = "am_user_platform_user${local.db_user_suffix}"
+  pg_user_subscription = "am_subscription_user${local.db_user_suffix}"
+  mongo_user_oms       = "am_oms_user${local.db_user_suffix}"
+  mongo_user_notification = "am_notification_user${local.db_user_suffix}"
+  pg_pass_platform = substr(sha256("pg|user_platform|${var.env}|${var.postgres_password}"), 0, 32)
+  pg_pass_subscription = substr(sha256("pg|am_subscription|${var.env}|${var.postgres_password}"), 0, 32)
+  mongo_pass_oms = substr(sha256("mongo|am_oms|${var.env}|${var.mongo_password}"), 0, 32)
+  mongo_pass_notification = substr(sha256("mongo|am_notification|${var.env}|${var.mongo_password}"), 0, 32)
 
   catalog = yamldecode(file("${path.module}/catalog/services.yaml"))
 
@@ -120,12 +144,12 @@ locals {
     POSTGRES_PORT              = "5432"
     POSTGRES_USER              = var.postgres_user
     POSTGRES_PASSWORD          = var.postgres_password
-    AM_USER_PLATFORM_DB_NAME   = "user_platform"
-    AM_USER_PLATFORM_DB_USER   = "am_user_platform_user"
-    AM_USER_PLATFORM_DB_PASSWORD = var.postgres_password
-    AM_SUBSCRIPTION_DB_NAME    = "am_subscription"
-    AM_SUBSCRIPTION_DB_USER    = "am_subscription_user"
-    AM_SUBSCRIPTION_DB_PASSWORD = var.postgres_password
+    AM_USER_PLATFORM_DB_NAME   = var.env == "prod" ? "user_platform" : "user_platform_${var.env}"
+    AM_USER_PLATFORM_DB_USER   = local.pg_user_platform
+    AM_USER_PLATFORM_DB_PASSWORD = local.pg_pass_platform
+    AM_SUBSCRIPTION_DB_NAME    = var.env == "prod" ? "am_subscription" : "am_subscription_${var.env}"
+    AM_SUBSCRIPTION_DB_USER    = local.pg_user_subscription
+    AM_SUBSCRIPTION_DB_PASSWORD = local.pg_pass_subscription
   }
 
   infra_mongodb = {
@@ -135,12 +159,12 @@ locals {
     password                     = var.mongo_password
     authSource                   = "admin"
     url                          = "mongodb://${var.mongo_user}:${var.mongo_password}@${local.mongo_host}:27017/?authSource=admin&directConnection=true"
-    AM_OMS_MONGO_DATABASE        = "am_oms"
-    AM_OMS_DB_USER               = "am_oms_user"
-    AM_OMS_DB_PASSWORD           = var.mongo_password
-    AM_NOTIFICATION_MONGO_DATABASE = "am_notification"
-    AM_NOTIFICATION_DB_USER      = "am_notification_user"
-    AM_NOTIFICATION_DB_PASSWORD  = var.mongo_password
+    AM_OMS_MONGO_DATABASE        = var.env == "prod" ? "am_oms" : "am_oms_${var.env}"
+    AM_OMS_DB_USER               = local.mongo_user_oms
+    AM_OMS_DB_PASSWORD           = local.mongo_pass_oms
+    AM_NOTIFICATION_MONGO_DATABASE = var.env == "prod" ? "am_notification" : "am_notification_${var.env}"
+    AM_NOTIFICATION_DB_USER      = local.mongo_user_notification
+    AM_NOTIFICATION_DB_PASSWORD  = local.mongo_pass_notification
   }
 
   infra_redis = {

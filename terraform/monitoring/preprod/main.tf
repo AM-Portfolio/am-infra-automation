@@ -1,4 +1,7 @@
 # ==============================================================================
+# RETIRED for Contabo/preprod Kind — do not terraform apply.
+# SoT Grafana = VPS2 compose/obs (grafana.asrax.in). See ../RETIRED.md
+# ==============================================================================
 # LOCAL ENVIRONMENT: MONITORING ENTRYPOINT
 # ==============================================================================
 

@@ -38,6 +38,19 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "edge" {
       }
     }
 
+    # Additive Kind API (and similar) origins — do not remove Traefik rules above.
+    dynamic "ingress_rule" {
+      for_each = var.extra_origin_ingress
+      content {
+        hostname = ingress_rule.key
+        service  = ingress_rule.value
+
+        origin_request {
+          no_tls_verify = true
+        }
+      }
+    }
+
     ingress_rule {
       service = "http_status:404"
     }

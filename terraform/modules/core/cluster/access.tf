@@ -1,5 +1,9 @@
 # ==============================================================================
-# CLUSTER ACCESS — optional kubeconfig write (skipped when path is empty)
+# CLUSTER ACCESS — BREAK-GLASS ONLY (iam-sso Phase 3+)
+# ==============================================================================
+# Writes a shared am-admin SA token kubeconfig for operators / automation.
+# Do NOT email this file to teammates. Day-to-day: Keycloak + Headlamp / oidc-login.
+# See docs/kind-fleet-clusters/iam-sso/
 # ==============================================================================
 
 resource "null_resource" "cluster_automation" {
@@ -12,7 +16,7 @@ resource "null_resource" "cluster_automation" {
   }
 
   provisioner "local-exec" {
-    interpreter = ["/bin/bash", "-c"]
+    interpreter = ["bash", "-c"]
     command     = "until docker exec ${local.cluster_name}-control-plane kubectl get nodes --kubeconfig /etc/kubernetes/admin.conf &>/dev/null; do sleep 2; done; docker exec ${local.cluster_name}-control-plane cat /etc/kubernetes/admin.conf > \"${var.config_output_path}.tmp\"; perl -pi -e \"s|https://.*:${local.api_server_port}|https://127.0.0.1:${local.api_server_port}|g\" \"${var.config_output_path}.tmp\"; docker exec ${local.cluster_name}-control-plane kubectl create serviceaccount am-admin -n kube-system --kubeconfig /etc/kubernetes/admin.conf || true; docker exec ${local.cluster_name}-control-plane kubectl create clusterrolebinding am-admin-binding --clusterrole=cluster-admin --serviceaccount=kube-system:am-admin --kubeconfig /etc/kubernetes/admin.conf || true; TOKEN=$(docker exec ${local.cluster_name}-control-plane kubectl create token am-admin -n kube-system --duration=24h --kubeconfig /etc/kubernetes/admin.conf); printf \"apiVersion: v1\\nkind: Config\\nclusters:\\n- cluster:\\n    server: https://127.0.0.1:${local.api_server_port}\\n    insecure-skip-tls-verify: true\\n  name: kind-${local.cluster_name}\\ncontexts:\\n- context:\\n    cluster: kind-${local.cluster_name}\\n    user: am-admin\\n  name: kind-${local.cluster_name}\\ncurrent-context: kind-${local.cluster_name}\\nusers:\\n- name: am-admin\\n  user:\\n    token: $TOKEN\\n\" > \"${var.config_output_path}\"; docker exec ${local.cluster_name}-control-plane kubectl taint nodes ${local.cluster_name}-control-plane node-role.kubernetes.io/control-plane:NoSchedule- --kubeconfig /etc/kubernetes/admin.conf || true; echo 'Automation Complete'"
   }
 
