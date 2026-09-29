@@ -42,6 +42,8 @@ patched = skipped = 0
 markers = (
     "redis.asrax.in", "mongodb.asrax.in", "mongo.asrax.in", "postgres.asrax.in",
     "kafka.asrax.in", "temporal-rpc-prod.asrax.in", "temporal-rpc-dr.asrax.in",
+    "temporal-rpc-preprod.asrax.in",
+    "redis-dr.asrax.in", "mongodb-dr.asrax.in", "postgres-dr.asrax.in", "kafka-dr.asrax.in",
 )
 for i in doc.get("items", []):
     kind = i["kind"]

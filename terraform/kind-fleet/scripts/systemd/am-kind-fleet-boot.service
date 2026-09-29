@@ -1,0 +1,18 @@
+[Unit]
+Description=AM Kind fleet boot: exposer + bridges + hostAliases + smoke
+Documentation=file:///root/am-repos/am-infra-automation/terraform/kind-fleet/scripts/systemd/README.md
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=ENV=prod
+Environment=HOME=/root
+Environment=ASRAX_HOME=/home/am-ops/.asrax
+ExecStart=/bin/bash /root/am-repos/am-infra-automation/terraform/kind-fleet/scripts/kind-fleet-boot.sh
+TimeoutStartSec=900
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

@@ -27,6 +27,34 @@ resource "kubernetes_service_v1" "nodeport" {
   }
 }
 
+# gRPC frontend for apps via am-port-exposer :7233 (TEMPORAL_HOST=temporal-rpc-<env>.asrax.in:7233).
+resource "kubernetes_service_v1" "frontend_nodeport" {
+  count      = var.enable_gateway ? 1 : 0
+  depends_on = [helm_release.temporal]
+  metadata {
+    name      = "temporal-frontend-nodeport"
+    namespace = var.namespace
+    labels = {
+      "app.kubernetes.io/name"      = "temporal"
+      "app.kubernetes.io/component" = "frontend"
+    }
+  }
+  spec {
+    type = "NodePort"
+    selector = {
+      "app.kubernetes.io/name"      = "temporal"
+      "app.kubernetes.io/instance"  = "temporal"
+      "app.kubernetes.io/component" = "frontend"
+    }
+    port {
+      name        = "grpc-rpc"
+      port        = 7233
+      target_port = 7233
+      node_port   = var.frontend_node_port
+    }
+  }
+}
+
 resource "kubectl_manifest" "ingressroute" {
   count     = var.enable_gateway && var.gateway_same_cluster ? 1 : 0
   yaml_body = <<-YAML
@@ -50,3 +78,4 @@ resource "kubectl_manifest" "ingressroute" {
 }
 
 output "node_port" { value = var.node_port }
+output "frontend_node_port" { value = var.frontend_node_port }

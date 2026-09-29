@@ -1,25 +1,25 @@
-# Cross-cluster bridge refresh (central)
+# Cross-cluster bridge + exposer hostAliases + Kind VPS boot (central)
 
-Kubernetes Endpoints only store IPs. After Docker/Kind restart, Kind node IPs on the docker network drift — infra Traefik bridges (`*-platform`, `apps-traefik-bridge`) go stale.
+Kubernetes Endpoints only store IPs. After Docker/Kind restart, Kind node IPs drift — infra Traefik bridges and apps `hostAliases` go stale.
 
-**SoT:** refresh from Docker DNS via label `am.io/backend-host` (set by `cross-cluster-http` / `apps-traefik-bridge` modules).
+**SoT:** refresh from Docker DNS; never bake `172.x` into app env (`TEMPORAL_HOST=temporal-rpc-<env>.asrax.in:7233`).
 
 | File | Use |
 |------|-----|
-| `refresh-cross-cluster-bridges.ps1` | Laptop / Windows / warmup |
-| `refresh-cross-cluster-bridges.sh` | Contabo / Linux / systemd |
-| `systemd/am-refresh-bridges.{service,timer}` | Auto every 2 min on Contabo |
-| `../{dev,prod,dr,preprod}/scripts/…` | Thin wrappers (fixed env) |
+| `refresh-cross-cluster-bridges.{ps1,sh}` | Bridges Endpoints |
+| `refresh-exposer-hostaliases.sh` | Apps hostAliases → exposer IP |
+| `ensure-port-exposer.sh` | Recreate exposer if store/Temporal ports closed |
+| `kind-fleet-boot.sh` | Ordered boot: ensure → bridges → hostAliases → smoke |
+| `systemd/am-refresh-bridges.*` | Timer every 2 min |
+| `systemd/am-refresh-exposer-hostaliases.*` | Timer every 2 min |
+| `systemd/am-kind-fleet-boot.*` | Once after VPS boot |
+| `../{prod,dr,preprod}/scripts/…` | Thin wrappers (fixed env) |
 
 ```text
-# one-shot
-powershell -File terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.ps1 -Env prod
-ENV=prod bash terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.sh
-
-# or env wrapper
-bash terraform/kind-fleet/prod/scripts/refresh-cross-cluster-bridges.sh
+ENV=prod bash terraform/kind-fleet/scripts/kind-fleet-boot.sh
+bash terraform/kind-fleet/prod/scripts/kind-fleet-boot.sh
 ```
 
-**Post-restart order:** exposer (Docker DNS) → Vault unseal → **this refresh** → warmup / restart CrashLoop pods.
+**Post-restart order:** Kind nodes → **ensure exposer** → bridges refresh → hostAliases refresh → smoke / CrashLoop recover.
 
-TCP stores stay on `am-port-exposer` (also Docker DNS) — do not bake `172.x` into socat.
+TCP stores + Temporal gRPC stay on `am-port-exposer` (Docker DNS aliases) — do not bake `172.x` into socat.

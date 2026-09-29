@@ -67,6 +67,12 @@ variable "node_port" {
   default = 30823
 }
 
+# Fixed NodePort for Temporal frontend gRPC (exposer :7233 → this).
+variable "frontend_node_port" {
+  type    = number
+  default = 30723
+}
+
 variable "gateway_same_cluster" {
   type    = bool
   default = false

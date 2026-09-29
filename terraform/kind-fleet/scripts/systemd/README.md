@@ -1,65 +1,72 @@
-# Contabo / Linux: install am-refresh-bridges timer
+# Contabo / Kind VPS: systemd units (root)
 
-Auto-maps infra Endpoints (`am.io/bridge=cross-cluster`) from Docker DNS every 2 minutes so `apps-traefik-bridge` and `*-platform` stay current after Docker restarts.
+Install the **same three units** on every Kind VPS (`prod`, `dr`, `preprod`). Set `Environment=ENV=…` and checkout/`ASRAX_HOME` paths for that host.
 
-Also install **`am-refresh-exposer-hostaliases`** so apps `hostAliases` track `am-port-exposer` Docker IP (store TCP :6379/:27017/:5432/:9092). Without it, pods may pin a stale Kind IP and CrashLoop on Mongo/Redis.
+| Unit | Purpose |
+|------|---------|
+| `am-refresh-bridges.timer` | Every 2m: cross-cluster Endpoints from Docker DNS |
+| `am-refresh-exposer-hostaliases.timer` | Every 2m: apps `hostAliases` IP → current `am-port-exposer` |
+| `am-kind-fleet-boot.timer` | Once after boot (~3m): ensure exposer → bridges → hostAliases → smoke |
 
-## One-time install (per host)
+Do **not** install these on dig laptop Kind (`overlays/dev` refuses hostAliases pins).
 
-Assume checkout at `$HOME/am-repos/am-infra-automation` (edit paths if different).
+## One-time install (root, Contabo prod example)
 
 ```bash
-REPO="${REPO:-$HOME/am-repos/am-infra-automation}"
-UNIT_DIR="$HOME/.config/systemd/user"   # or /etc/systemd/system for root
-mkdir -p "$UNIT_DIR"
+REPO="${REPO:-/root/am-repos/am-infra-automation}"
+UNIT_DIR=/etc/systemd/system
+ENV_NAME=prod   # dr | preprod on other VPS
+ASRAX_HOME=/home/am-ops/.asrax
 
-# Copy units
 cp "$REPO/terraform/kind-fleet/scripts/systemd/am-refresh-bridges.service" "$UNIT_DIR/"
 cp "$REPO/terraform/kind-fleet/scripts/systemd/am-refresh-bridges.timer" "$UNIT_DIR/"
-
-# Fix ExecStart path + ENV for this host (example: Contabo prod)
-sed -i "s|/opt/am/am-infra-automation|$REPO|g" "$UNIT_DIR/am-refresh-bridges.service"
-# ENV=prod | ENV=dr | ENV=preprod | ENV=dev
-sed -i 's/^Environment=ENV=.*/Environment=ENV=prod/' "$UNIT_DIR/am-refresh-bridges.service"
-
-# Ensure script is executable
-chmod +x "$REPO/terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.sh"
-chmod +x "$REPO/terraform/kind-fleet/"*/scripts/refresh-cross-cluster-bridges.sh
-
-# User systemd (linger so it survives logout)
-systemctl --user daemon-reload
-systemctl --user enable --now am-refresh-bridges.timer
-loginctl enable-linger "$USER"   # once
-
-# Verify
-systemctl --user list-timers | grep am-refresh
-systemctl --user start am-refresh-bridges.service
-systemctl --user status am-refresh-bridges.service --no-pager
-```
-
-### Exposer hostAliases timer (same host)
-
-```bash
 cp "$REPO/terraform/kind-fleet/scripts/systemd/am-refresh-exposer-hostaliases.service" "$UNIT_DIR/"
 cp "$REPO/terraform/kind-fleet/scripts/systemd/am-refresh-exposer-hostaliases.timer" "$UNIT_DIR/"
-sed -i "s|/root/am-repos/am-infra-automation|$REPO|g" "$UNIT_DIR/am-refresh-exposer-hostaliases.service"
-sed -i "s|ASRAX_HOME=.*|ASRAX_HOME=$HOME/.asrax|" "$UNIT_DIR/am-refresh-exposer-hostaliases.service"
-chmod +x "$REPO/terraform/kind-fleet/scripts/refresh-exposer-hostaliases.sh"
-systemctl --user daemon-reload
-systemctl --user enable --now am-refresh-exposer-hostaliases.timer
+cp "$REPO/terraform/kind-fleet/scripts/systemd/am-kind-fleet-boot.service" "$UNIT_DIR/"
+cp "$REPO/terraform/kind-fleet/scripts/systemd/am-kind-fleet-boot.timer" "$UNIT_DIR/"
+
+# Paths + ENV
+for u in am-refresh-bridges.service am-refresh-exposer-hostaliases.service am-kind-fleet-boot.service; do
+  sed -i "s|/opt/am/am-infra-automation|$REPO|g" "$UNIT_DIR/$u"
+  sed -i "s|/root/am-repos/am-infra-automation|$REPO|g" "$UNIT_DIR/$u"
+  sed -i "s|^Environment=ENV=.*|Environment=ENV=$ENV_NAME|" "$UNIT_DIR/$u"
+  sed -i "s|^Environment=ASRAX_HOME=.*|Environment=ASRAX_HOME=$ASRAX_HOME|" "$UNIT_DIR/$u"
+done
+
+chmod +x \
+  "$REPO/terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.sh" \
+  "$REPO/terraform/kind-fleet/scripts/refresh-exposer-hostaliases.sh" \
+  "$REPO/terraform/kind-fleet/scripts/ensure-port-exposer.sh" \
+  "$REPO/terraform/kind-fleet/scripts/kind-fleet-boot.sh" \
+  "$REPO/terraform/kind-fleet/$ENV_NAME/scripts/"*.sh 2>/dev/null || true
+
+systemctl daemon-reload
+systemctl enable --now am-refresh-bridges.timer
+systemctl enable --now am-refresh-exposer-hostaliases.timer
+systemctl enable --now am-kind-fleet-boot.timer
+
+# Soft prove (no reboot)
+systemctl start am-kind-fleet-boot.service
+systemctl status am-kind-fleet-boot.service --no-pager
+systemctl list-timers | grep am-
 ```
 
-For **root** units under `/etc/systemd/system`, replace `%h` with absolute paths and use `systemctl` (no `--user`). Set `ASRAX_HOME` to the operator home that holds `~/.asrax/kubeconfig.am-<env>-infra.yaml`.
+### DR / preprod
 
-## Manual one-shot (same as timer)
+Same commands with `ENV_NAME=dr` or `ENV_NAME=preprod` on that VPS. Temporal RPC DNS:
+
+- prod → `temporal-rpc-prod.asrax.in:7233` (UI `https://temporal.asrax.in`)
+- dr → `temporal-rpc-dr.asrax.in:7233` (UI `https://temporal-dr.asrax.in`)
+- preprod → `temporal-rpc-preprod.asrax.in:7233`
+
+## Manual one-shot
 
 ```bash
-# Contabo prod
-bash "$HOME/am-repos/am-infra-automation/terraform/kind-fleet/prod/scripts/refresh-cross-cluster-bridges.sh"
+bash "$REPO/terraform/kind-fleet/prod/scripts/kind-fleet-boot.sh"
 # or
-ENV=prod bash "$HOME/am-repos/am-infra-automation/terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.sh"
+ENV=prod bash "$REPO/terraform/kind-fleet/scripts/kind-fleet-boot.sh"
 ```
 
-## DR / preprod
+## After VPS reboot (expected)
 
-Same units; set `Environment=ENV=dr` or `ENV=preprod` in the service file (or use the matching thin wrapper as `ExecStart`).
+Within ~15 minutes: exposer ports `6379/27017/5432/9092/7233` OPEN, hostAliases IP matches exposer, bridges refreshed, market batch returns JSON (not SPA 405 HTML), support-worker Ready.

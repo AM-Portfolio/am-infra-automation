@@ -24,6 +24,28 @@ if [[ ! -f "$INFRA_KUBECONFIG" ]]; then
   exit 1
 fi
 
+# Contabo/Kind: kubeconfig may point at a stale API URL — rewrite to live infra CP Docker IP.
+INFRA_CP="am-${ENV_NAME}-infra-control-plane"
+if docker inspect "$INFRA_CP" >/dev/null 2>&1; then
+  CP_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' "$INFRA_CP" | awk '{print $1}')
+  OUT="/tmp/kubeconfig.am-${ENV_NAME}-infra.bridges.yaml"
+  python3 - "$INFRA_KUBECONFIG" "$CP_IP" "$OUT" <<'PY'
+import re, socket, sys
+src, ip, dst = sys.argv[1], sys.argv[2], sys.argv[3]
+t = open(src).read()
+for port in (6443, 6444):
+    try:
+        s = socket.create_connection((ip, port), 2); s.close()
+        open(dst, "w").write(re.sub(r"(https?://)[^\s]+", f"https://{ip}:{port}", t, count=1))
+        break
+    except OSError:
+        pass
+else:
+    raise SystemExit(f"no API for {ip}")
+PY
+  INFRA_KUBECONFIG="$OUT"
+fi
+
 export ENV_NAME NAMESPACE INFRA_KUBECONFIG
 
 exec python3 - <<'PY'

@@ -1,18 +1,13 @@
 [Unit]
 Description=AM Kind fleet: refresh cross-cluster bridge Endpoints from Docker DNS
-Documentation=file://%h/am-infra-automation/terraform/kind-fleet/scripts/README.md
+Documentation=file:///root/am-repos/am-infra-automation/terraform/kind-fleet/scripts/systemd/README.md
 After=docker.service
 Requires=docker.service
 
 [Service]
 Type=oneshot
-# Override ENV on install (prod|dr|preprod|dev). Default prod.
 Environment=ENV=prod
-Environment=ASRAX_HOME=%h/.asrax
-# Absolute path to the central script on this host (adjust on install; see systemd/README.md).
-# Placeholder: replace with real checkout path when installing.
-ExecStart=/bin/bash /opt/am/am-infra-automation/terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.sh
-# Prefer env thin wrapper if you pin ENV via the wrapper instead of Environment=:
-# ExecStart=/bin/bash /opt/am/am-infra-automation/terraform/kind-fleet/prod/scripts/refresh-cross-cluster-bridges.sh
-
+Environment=HOME=/root
+Environment=ASRAX_HOME=/home/am-ops/.asrax
+ExecStart=/bin/bash /root/am-repos/am-infra-automation/terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.sh
 Nice=10

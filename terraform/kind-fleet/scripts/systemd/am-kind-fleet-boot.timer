@@ -1,0 +1,11 @@
+[Unit]
+Description=Timer: run kind-fleet-boot once shortly after boot
+
+[Timer]
+OnBootSec=3min
+AccuracySec=30s
+Unit=am-kind-fleet-boot.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
