@@ -1,5 +1,5 @@
 [Unit]
-Description=AM Kind fleet boot: exposer + bridges + hostAliases + smoke
+Description=AM Kind fleet boot: exposer + bridges + CoreDNS hosts + smoke
 Documentation=file:///root/am-repos/am-infra-automation/terraform/kind-fleet/scripts/systemd/README.md
 After=docker.service
 Wants=docker.service
