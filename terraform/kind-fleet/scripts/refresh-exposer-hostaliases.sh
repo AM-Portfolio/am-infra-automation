@@ -39,7 +39,10 @@ import json, sys, subprocess
 new = sys.argv[1]
 doc = json.load(open("/tmp/ha-workloads.json"))
 patched = skipped = 0
-markers = ("redis.asrax.in", "mongodb.asrax.in", "mongo.asrax.in", "postgres.asrax.in", "kafka.asrax.in")
+markers = (
+    "redis.asrax.in", "mongodb.asrax.in", "mongo.asrax.in", "postgres.asrax.in",
+    "kafka.asrax.in", "temporal-rpc-prod.asrax.in", "temporal-rpc-dr.asrax.in",
+)
 for i in doc.get("items", []):
     kind = i["kind"]
     ns = i["metadata"]["namespace"]

@@ -17,19 +17,20 @@ locals {
     { name = "minio", host_port = 9000, target_port = 30900 },
     { name = "vault", host_port = 8200, target_port = 30820 },
   ]
-  # Temporal gRPC on platform CP NodePort (not infra-worker).
-  temporal_node      = "am-${local.env}-platform-control-plane"
+  # Temporal gRPC NodePort (Contabo prod: Temporal runs on infra, not a separate platform cluster).
+  temporal_node      = "am-${local.env}-infra-control-plane"
   temporal_host_port = 7233
   temporal_node_port = 30723
   # Split-horizon: kind-network pods resolve bare TCP store FQDNs to exposer (public A hairpins fail).
   # Do NOT alias vault/influx HTTPS names — those must stay CF-proxied (443). Exposer only bridges TCP :8200/:8086.
   # Apps/env/Vault often use mongodb.asrax.in while mapping name is "mongo" — alias both.
+  # temporal-rpc-prod.asrax.in:7233 is the stable gRPC name (TEMPORAL_HOST); UI stays https://temporal.asrax.in
   store_aliases = distinct(concat(
     [
       for m in local.mappings_ports : "${m.name}.${local.domain}"
       if !contains(["vault", "influx"], m.name)
     ],
-    ["mongodb.${local.domain}"],
+    ["mongodb.${local.domain}", "temporal-rpc-prod.${local.domain}"],
   ))
   docker_ports = join(" ", concat(
     [for m in local.mappings_ports : "-p ${m.host_port}:${m.host_port}"],
@@ -45,8 +46,8 @@ resource "null_resource" "port_exposer" {
     aliases        = jsonencode(local.store_aliases)
     temporal_node  = local.temporal_node
     temporal_ports = "${local.temporal_host_port}:${local.temporal_node_port}"
-    # v8: Temporal gRPC :7233 → platform CP :30723
-    version = "8-temporal-grpc"
+    # v9: Temporal gRPC :7233 → infra CP :30723 + temporal-rpc-prod alias
+    version = "9-temporal-rpc-dns"
   }
 
   provisioner "local-exec" {
