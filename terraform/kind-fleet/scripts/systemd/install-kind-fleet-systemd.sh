@@ -31,6 +31,7 @@ done
 
 chmod +x \
   "$SRC/refresh-cross-cluster-bridges.sh" \
+  "$SRC/refresh-exposer-coredns.sh" \
   "$SRC/refresh-exposer-hostaliases.sh" \
   "$SRC/ensure-port-exposer.sh" \
   "$SRC/kind-fleet-boot.sh" \

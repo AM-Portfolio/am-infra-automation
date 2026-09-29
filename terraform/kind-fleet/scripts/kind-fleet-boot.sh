@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ordered Kind VPS boot: wait nodes → exposer → bridges → hostAliases → smoke.
+# Ordered Kind VPS boot: wait nodes → exposer → bridges → CoreDNS hosts → smoke.
 #
 # Usage:
 #   ENV=prod ./kind-fleet-boot.sh
@@ -29,11 +29,13 @@ else
   echo "WARN: missing refresh-cross-cluster-bridges.sh"
 fi
 
-echo "== 3 refresh-exposer-hostaliases =="
-if [[ -x "$ROOT/refresh-exposer-hostaliases.sh" ]]; then
-  ENV="$ENV_NAME" bash "$ROOT/refresh-exposer-hostaliases.sh" || echo "WARN: hostAliases refresh failed (continue)"
+echo "== 3 refresh-exposer-coredns =="
+if [[ -x "$ROOT/refresh-exposer-coredns.sh" ]]; then
+  bash "$ROOT/refresh-exposer-coredns.sh" "$ENV_NAME" || echo "WARN: CoreDNS exposer hosts refresh failed (continue)"
+elif [[ -x "$ROOT/refresh-exposer-hostaliases.sh" ]]; then
+  bash "$ROOT/refresh-exposer-hostaliases.sh" "$ENV_NAME" || echo "WARN: CoreDNS refresh wrapper failed (continue)"
 else
-  echo "WARN: missing refresh-exposer-hostaliases.sh"
+  echo "WARN: missing refresh-exposer-coredns.sh"
 fi
 
 echo "== 4 smoke =="

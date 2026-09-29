@@ -5,10 +5,12 @@ Install the **same three units** on every Kind VPS (`prod`, `dr`, `preprod`). Se
 | Unit | Purpose |
 |------|---------|
 | `am-refresh-bridges.timer` | Every 2m: cross-cluster Endpoints from Docker DNS |
-| `am-refresh-exposer-hostaliases.timer` | Every 2m: apps `hostAliases` IP → current `am-port-exposer` |
-| `am-kind-fleet-boot.timer` | Once after boot (~3m): ensure exposer → bridges → hostAliases → smoke |
+| `am-refresh-exposer-hostaliases.timer` | Every 2m: apps CoreDNS `hosts` → current `am-port-exposer` IP (unit name kept; script is `refresh-exposer-coredns.sh`) |
+| `am-kind-fleet-boot.timer` | Once after boot (~3m): ensure exposer → bridges → CoreDNS → smoke |
 
-Do **not** install these on dig laptop Kind (`overlays/dev` refuses hostAliases pins).
+Do **not** install these on dig laptop Kind (`overlays/dev` refuses Contabo store pins).
+
+**SoT:** app env uses DNS names only (`redis.asrax.in`, `temporal-rpc-<env>.asrax.in`). **Never** bake `172.18.x` into gitops hostAliases — CoreDNS hosts plugin is refreshed by the timer.
 
 ## One-time install (root, Contabo prod example)
 
@@ -35,6 +37,7 @@ done
 
 chmod +x \
   "$REPO/terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.sh" \
+  "$REPO/terraform/kind-fleet/scripts/refresh-exposer-coredns.sh" \
   "$REPO/terraform/kind-fleet/scripts/refresh-exposer-hostaliases.sh" \
   "$REPO/terraform/kind-fleet/scripts/ensure-port-exposer.sh" \
   "$REPO/terraform/kind-fleet/scripts/kind-fleet-boot.sh" \
@@ -69,4 +72,4 @@ ENV=prod bash "$REPO/terraform/kind-fleet/scripts/kind-fleet-boot.sh"
 
 ## After VPS reboot (expected)
 
-Within ~15 minutes: exposer ports `6379/27017/5432/9092/7233` OPEN, hostAliases IP matches exposer, bridges refreshed, market batch returns JSON (not SPA 405 HTML), support-worker Ready.
+Within ~15 minutes: exposer ports `6379/27017/5432/9092/7233` OPEN, CoreDNS hosts IP matches exposer, bridges refreshed, market batch returns JSON (not SPA 405 HTML), support-worker Ready.
