@@ -1,0 +1,13 @@
+[Unit]
+Description=AM Kind fleet: periodic cross-cluster bridge Endpoint refresh
+Documentation=file://%h/am-infra-automation/terraform/kind-fleet/scripts/README.md
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=30s
+Persistent=true
+Unit=am-refresh-bridges.service
+
+[Install]
+WantedBy=timers.target

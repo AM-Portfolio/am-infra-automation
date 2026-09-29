@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh Contabo Kind apps hostAliases to am-port-exposer IP
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=ENV=prod
+Environment=HOME=/root
+Environment=ASRAX_HOME=/home/am-ops/.asrax
+ExecStart=/bin/bash /root/am-repos/am-infra-automation/terraform/kind-fleet/scripts/refresh-exposer-hostaliases.sh
