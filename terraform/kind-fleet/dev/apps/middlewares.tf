@@ -13,9 +13,9 @@ resource "kubernetes_manifest" "middleware_global_cors_apps" {
     }
     spec = {
       headers = {
-        accessControlAllowMethods    = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
-        accessControlAllowHeaders    = ["*"]
-        accessControlAllowOriginList = ["*"]
+        accessControlAllowMethods     = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+        accessControlAllowHeaders     = ["*"]
+        accessControlAllowOriginList  = ["*"]
         accessControlAllowCredentials = true
       }
     }
@@ -74,9 +74,9 @@ resource "kubernetes_manifest" "middleware_global_cors_agents" {
     }
     spec = {
       headers = {
-        accessControlAllowMethods    = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
-        accessControlAllowHeaders    = ["*"]
-        accessControlAllowOriginList = ["*"]
+        accessControlAllowMethods     = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+        accessControlAllowHeaders     = ["*"]
+        accessControlAllowOriginList  = ["*"]
         accessControlAllowCredentials = true
       }
     }

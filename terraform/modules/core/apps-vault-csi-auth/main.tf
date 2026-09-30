@@ -3,11 +3,13 @@
 # Prefer this over setup-g25-vault-auth.ps1.
 
 locals {
-  bound_namespaces  = [var.apps_ns, var.agents_ns]
-  pull_secret_names = ["github-registry-secret", "regcred", "ghcr-creds"]
+  # Vault CSI role stays on apps+agents only; pull secrets may also cover colocated env NS (e.g. preprod on laptop Kind).
+  bound_namespaces       = [var.apps_ns, var.agents_ns]
+  pull_secret_namespaces = distinct(concat(local.bound_namespaces, var.extra_pull_secret_namespaces))
+  pull_secret_names      = ["github-registry-secret", "regcred", "ghcr-creds"]
   # Keys must not derive from sensitive values (ghcr_token) — gate via create_pull_secrets only.
   pull_secret_map = var.create_pull_secrets ? {
-    for pair in setproduct(local.bound_namespaces, local.pull_secret_names) :
+    for pair in setproduct(local.pull_secret_namespaces, local.pull_secret_names) :
     "${pair[0]}.${pair[1]}" => { ns = pair[0], name = pair[1] }
   } : {}
   dockerconfig = {
@@ -65,7 +67,7 @@ resource "kubernetes_token_request_v1" "vault_auth_reviewer" {
 # --- Vault: policy + kubernetes auth for apps CSI ---
 
 resource "vault_policy" "am_apps_read" {
-  name = var.policy_name
+  name   = var.policy_name
   policy = <<-EOT
     path "apps/data/${var.env}/*" { capabilities = ["create","read","update","list"] }
     path "apps/metadata/${var.env}/*" { capabilities = ["list"] }
@@ -101,7 +103,7 @@ resource "vault_kubernetes_auth_backend_role" "am_backend" {
   depends_on = [vault_kubernetes_auth_backend_config.apps]
 }
 
-# --- GHCR pull secrets in apps + agents NS ---
+# --- GHCR pull secrets in apps + agents (+ optional extra NS) ---
 
 resource "kubernetes_secret_v1" "ghcr" {
   for_each = local.pull_secret_map

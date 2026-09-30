@@ -11,10 +11,11 @@ locals {
 
 resource "null_resource" "kubeapi_proxy_ensure" {
   triggers = {
-    manifest_sha = filesha256(local.kubeapi_manifest)
-    loop_sha     = filesha256(local.kubeapi_loop)
-    version      = "2-loop-script"
-    apps_cp      = local.kubeapi_apps_cp
+    manifest_sha   = filesha256(local.kubeapi_manifest)
+    loop_sha       = filesha256(local.kubeapi_loop)
+    version        = "2-loop-script"
+    apps_cp        = local.kubeapi_apps_cp
+    container_name = local.kubeapi_ensure_name
   }
 
   provisioner "local-exec" {
@@ -42,9 +43,9 @@ resource "null_resource" "kubeapi_proxy_ensure" {
 
       docker run -d --name $name --restart always --network kind `
         -e APPS_CP=$cp -e INTERVAL=30 -e MANIFEST=/manifests/kubeapi-proxy.yaml `
-        -v "${kc}:/kubeconfig.host:ro" `
-        -v "${manifest}:/manifests/kubeapi-proxy.yaml:ro" `
-        -v "${loop}:/ensure-loop.sh:ro" `
+        -v "$${kc}:/kubeconfig.host:ro" `
+        -v "$${manifest}:/manifests/kubeapi-proxy.yaml:ro" `
+        -v "$${loop}:/ensure-loop.sh:ro" `
         --entrypoint /bin/bash alpine/k8s:1.31.4 `
         /ensure-loop.sh
 
@@ -61,7 +62,7 @@ resource "null_resource" "kubeapi_proxy_ensure" {
   provisioner "local-exec" {
     when        = destroy
     interpreter = ["PowerShell", "-NoProfile", "-Command"]
-    command     = "$ErrorActionPreference='Continue'; docker rm -f ${local.kubeapi_ensure_name} 2>$null | Out-Null"
+    command     = "$ErrorActionPreference='Continue'; docker rm -f ${self.triggers.container_name} 2>$null | Out-Null"
   }
 }
 

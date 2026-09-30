@@ -52,3 +52,9 @@ variable "create_pull_secrets" {
   type        = bool
   default     = true
 }
+
+variable "extra_pull_secret_namespaces" {
+  description = "Additional namespaces that get the same GHCR dockerconfigjson secrets (Vault bound_namespaces stay apps+agents only)"
+  type        = list(string)
+  default     = []
+}

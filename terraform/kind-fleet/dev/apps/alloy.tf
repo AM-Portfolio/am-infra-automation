@@ -10,7 +10,7 @@ locals {
 module "alloy_logs" {
   source = "../../../modules/core/alloy-logs"
 
-  namespace                    = "monitoring"
+  namespace                   = "monitoring"
   cluster_name                = module.cluster.cluster_name
   environment                 = local.env
   vps                         = "vps-dev"
