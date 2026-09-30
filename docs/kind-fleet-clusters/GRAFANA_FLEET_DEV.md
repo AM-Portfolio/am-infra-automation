@@ -12,10 +12,13 @@ Auth stays env-suffixed (`auth-dev.asrax.in`, …). Distinguishing sources = lab
 | **Interim (retired)** | was `am-dev-platform` / `monitoring` | Laptop `asrax-dev-tunnel` — bare Hosts **removed**; pods scaled to 0 ([obs/phase-4.md](obs/phase-4.md)). |
 | **Contabo/preprod LGTM (retired 2026-09-26)** | was Contabo Kind `monitoring` Grafana/Prom/Loki (+ PVCs) | **Removed** — Alloy shipper only on Contabo/ITSmart Kind; do not re-apply `am-infra/k8s/grafana` or `terraform/monitoring`. |
 
-After Docker/Kind restart, refresh bridge Endpoints (Kind IPs drift):
+After Docker/Kind restart, refresh bridge Endpoints (Kind IPs drift) — central script (all envs):
 
 ```text
-powershell -File terraform/kind-fleet/dev/obs/scripts/refresh-platform-bridges.ps1 -Env dev
+powershell -File terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.ps1 -Env dev
+# Contabo / Linux:
+#   ENV=prod bash terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.sh
+# Thin wrappers: terraform/kind-fleet/<env>/scripts/refresh-cross-cluster-bridges.{ps1,sh}
 ```
 
 Or run staged warmup (infra gates → batches of 5): `terraform apply` in `kind-fleet/dev/warmup` with a new `warmup_generation`.
@@ -42,7 +45,7 @@ Sizing / Phase 11 VPS2: [OBS_VPS2_SIZING.md](OBS_VPS2_SIZING.md).
 | 6 | Cursor: MCP server **`grafana-dev`** → `~/.asrax/bin/grafana-dev-mcp.cmd`; reload | MCP `list_datasources` returns prometheus + loki |
 | 7 | Identity (human): Keycloak client `grafana` → `https://grafana.asrax.in/*` (platform TF seeds bare host) | Login via Keycloak; break-glass admin in Vault `apps/data/dev/infra/observability` |
 
-**Apply order:** `edge` → `obs` → `apps` → `infra` → platform Keycloak clients if redirect host changed. **Post-restart:** `exposer` → G25 vault CSI → `refresh-platform-bridges` / `warmup`.
+**Apply order:** `edge` → `obs` → `apps` → `infra` → platform Keycloak clients if redirect host changed. **Post-restart:** `exposer` → G25 vault CSI → `refresh-cross-cluster-bridges` / `warmup`.
 
 **NodePorts (Kind bridge backends only):** Grafana **30350**, Loki gateway **30310**, Prometheus **30311**. Alloy egress uses HTTPS FQDNs.
 

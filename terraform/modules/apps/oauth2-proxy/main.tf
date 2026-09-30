@@ -69,6 +69,18 @@ variable "node_port" {
   description = "Optional NodePort for cross-cluster-http backends."
 }
 
+variable "oidc_extra_audiences" {
+  type        = list(string)
+  default     = ["account"]
+  description = "Extra JWT aud values Keycloak may emit; oauth2-proxy rejects tokens that only have account/realm-management."
+}
+
+variable "oidc_scope" {
+  type        = string
+  default     = "openid email profile"
+  description = "OIDC scopes requested from Keycloak. Do not include unassigned client scopes (e.g. groups) unless attached on the client."
+}
+
 variable "enable_gateway" {
   type    = bool
   default = true
@@ -103,9 +115,10 @@ resource "helm_release" "oauth2_proxy" {
         email_domains = [ "${join("\", \"", var.email_domains)}" ]
         upstreams = [ "${var.upstream}" ]
         redirect_url = "${var.redirect_url}"
-        scope = "openid email profile roles groups"
+        scope = "${var.oidc_scope}"
         code_challenge_method = "S256"
         oidc_groups_claim = "groups"
+        oidc_extra_audiences = "${join(",", var.oidc_extra_audiences)}"
         allowed_groups = [ "${join("\", \"", var.allowed_groups)}" ]
         skip_provider_button = true
         reverse_proxy = true

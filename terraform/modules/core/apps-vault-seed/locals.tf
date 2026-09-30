@@ -2,9 +2,12 @@ locals {
   # Host naming: prod uses bare Phase-2/3 names; others use -<env> suffix.
   # Auth = Keycloak public host (auth*.asrax.in). Quarkus KC has no /auth context path.
   # Contabo dig (env=dev + store_hosts=contabo_prod): Vault paths stay apps/data/dev/*,
-  # but PG/Mongo/Redis/Kafka/Influx hit Contabo prod stores — there is no dig store plane.
+  # but PG/Mongo/Redis/Kafka/Influx hit Contabo prod stores — isolation = shared dig_vault_seed
+  # + per-service *_dev resource names (never prod DB/prefix/topic/bucket).
   host_suffix = var.env == "prod" ? "" : "-${var.env}"
   use_contabo_prod_stores = var.store_hosts == "contabo_prod"
+  # Contabo env=dev shared-cred isolation (IAM store isolation plan).
+  dig_shared = local.use_contabo_prod_stores && var.env == "dev"
 
   pg_host = local.use_contabo_prod_stores ? "postgres.${var.domain}" : "postgres${local.host_suffix}.${var.domain}"
   mongo_host = (
@@ -27,17 +30,82 @@ locals {
   )
   otel_host = "https://otel${local.host_suffix}.${var.domain}"
 
-  # Per-DB app users (never one shared admin for app traffic). Dig Contabo uses *_dev names
-  # on Contabo prod stores; passwords are unique per DB (not the cluster admin password).
+  # Per-DB app users for classic Kind dig / prod. Contabo dig uses shared dig_vault_seed only.
   db_user_suffix = var.env == "prod" ? "" : "_${var.env}"
-  pg_user_platform     = "am_user_platform_user${local.db_user_suffix}"
-  pg_user_subscription = "am_subscription_user${local.db_user_suffix}"
-  mongo_user_oms       = "am_oms_user${local.db_user_suffix}"
-  mongo_user_notification = "am_notification_user${local.db_user_suffix}"
-  pg_pass_platform = substr(sha256("pg|user_platform|${var.env}|${var.postgres_password}"), 0, 32)
-  pg_pass_subscription = substr(sha256("pg|am_subscription|${var.env}|${var.postgres_password}"), 0, 32)
-  mongo_pass_oms = substr(sha256("mongo|am_oms|${var.env}|${var.mongo_password}"), 0, 32)
-  mongo_pass_notification = substr(sha256("mongo|am_notification|${var.env}|${var.mongo_password}"), 0, 32)
+  pg_user_platform     = local.dig_shared ? var.postgres_user : "am_user_platform_user${local.db_user_suffix}"
+  pg_user_subscription = local.dig_shared ? var.postgres_user : "am_subscription_user${local.db_user_suffix}"
+  mongo_user_oms       = local.dig_shared ? var.mongo_user : "am_oms_user${local.db_user_suffix}"
+  mongo_user_notification = local.dig_shared ? var.mongo_user : "am_notification_user${local.db_user_suffix}"
+  pg_pass_platform = local.dig_shared ? var.postgres_password : substr(sha256("pg|user_platform|${var.env}|${var.postgres_password}"), 0, 32)
+  pg_pass_subscription = local.dig_shared ? var.postgres_password : substr(sha256("pg|am_subscription|${var.env}|${var.postgres_password}"), 0, 32)
+  mongo_pass_oms = local.dig_shared ? var.mongo_password : substr(sha256("mongo|am_oms|${var.env}|${var.mongo_password}"), 0, 32)
+  mongo_pass_notification = local.dig_shared ? var.mongo_password : substr(sha256("mongo|am_notification|${var.env}|${var.mongo_password}"), 0, 32)
+
+  # Env=dev Contabo resource names (plan inventory). Prod / classic Kind keep legacy names.
+  mongo_db = {
+    oms           = local.dig_shared ? "am_oms_dev" : (var.env == "prod" ? "am_oms" : "am_oms_${var.env}")
+    notification  = local.dig_shared ? "am_notification_dev" : (var.env == "prod" ? "am_notification" : "am_notification_${var.env}")
+    news          = local.dig_shared ? "am_news_dev" : (var.env == "prod" ? "am_news" : "am_news_${var.env}")
+    portfolio     = local.dig_shared ? "am_portfolio_dev" : (var.env == "prod" ? "portfolio" : "portfolio_${var.env}")
+    trade         = local.dig_shared ? "am_trade_dev" : (var.env == "prod" ? "trade" : "trade_${var.env}")
+    analysis      = local.dig_shared ? "am_analysis_dev" : (var.env == "prod" ? "analysis" : "analysis_${var.env}")
+    mcp           = local.dig_shared ? "am_mcp_dev" : (var.env == "prod" ? "mcp" : "mcp_${var.env}")
+    doc_intel     = local.dig_shared ? "am_doc_intel_dev" : (var.env == "prod" ? "am_docs" : "am_docs_${var.env}")
+    logging       = local.dig_shared ? "am_logging_dev" : (var.env == "prod" ? "am_analytics" : "am_analytics_${var.env}")
+    asrax_corp    = local.dig_shared ? "am_asrax_corp_dev" : (var.env == "prod" ? "am_asrax_corp" : "am_asrax_corp_${var.env}")
+    mkt_agent     = local.dig_shared ? "am_mkt_agent_dev" : (var.env == "prod" ? "am_mkt" : "am_mkt_${var.env}")
+    engage        = local.dig_shared ? "am_engage_dev" : (var.env == "prod" ? "am_engage" : "am_engage_${var.env}")
+    fin_agent     = local.dig_shared ? "am_fin_agent_dev" : (var.env == "prod" ? "fin_agent" : "fin_agent_${var.env}")
+    market_data   = local.dig_shared ? "market_data_dev" : (var.env == "prod" ? "market_data" : "market_data_${var.env}")
+    mutual_funds  = local.dig_shared ? "mutual_funds_dev" : (var.env == "prod" ? "mutual_funds" : "mutual_funds_${var.env}")
+    ui_testing    = local.dig_shared ? "am_ui_testing_dev" : (var.env == "prod" ? "am_ui_testing" : "am_ui_testing_${var.env}")
+    db_agent      = local.dig_shared ? "am_db_agent_dev" : (var.env == "prod" ? "am_db_agent" : "am_db_agent_${var.env}")
+    tool_agent    = local.dig_shared ? "am_tool_agent_dev" : (var.env == "prod" ? "am_tool_agent" : "am_tool_agent_${var.env}")
+    qa_agent      = local.dig_shared ? "am_qa_agent_dev" : (var.env == "prod" ? "am_qa_agent" : "am_qa_agent_${var.env}")
+    support_agent = local.dig_shared ? "am_support_agent_dev" : (var.env == "prod" ? "am_support_agent" : "am_support_agent_${var.env}")
+  }
+
+  pg_db_platform     = local.dig_shared ? "user_platform_dev" : (var.env == "prod" ? "user_platform" : "user_platform_${var.env}")
+  pg_db_subscription = local.dig_shared ? "am_subscription_dev" : (var.env == "prod" ? "am_subscription" : "am_subscription_${var.env}")
+  # QA on Contabo dig: shared dig role against user_platform_dev (restricted to *_dev DBs).
+  qa_pg_db = local.dig_shared ? local.pg_db_platform : var.postgres_db
+
+  redis_prefix = {
+    market_data  = local.dig_shared ? "am-market-data-dev:" : "am-market-data:"
+    gateway      = local.dig_shared ? "am-gateway-dev:" : "am-gateway:"
+    portfolio    = local.dig_shared ? "am-portfolio-dev:" : "am-portfolio:"
+    trade        = local.dig_shared ? "am-trade-dev:" : "am-trade:"
+    analysis     = local.dig_shared ? "am-analysis-dev:" : "am-analysis:"
+    oms          = local.dig_shared ? "am-oms-dev:" : "am-oms:"
+    notification = local.dig_shared ? "am-notification-dev:" : "am-notification:"
+    api_gateway  = local.dig_shared ? "am-api-gateway-dev:" : "am-api-gateway:"
+  }
+
+  kafka_topic_prefix = {
+    market       = local.dig_shared ? "am.market.dev." : "am.market."
+    gateway      = local.dig_shared ? "am.gateway.dev." : "am.gateway."
+    oms          = local.dig_shared ? "am.oms.dev." : "am.oms."
+    notification = local.dig_shared ? "am.notification.dev." : "am.notification."
+    portfolio    = local.dig_shared ? "am.portfolio.dev." : "am.portfolio."
+    trade        = local.dig_shared ? "am.trade.dev." : "am.trade."
+    doc          = local.dig_shared ? "am.doc.dev." : "am.doc."
+    mcp          = local.dig_shared ? "am.mcp.dev." : "am.mcp."
+    logging      = local.dig_shared ? "am.logging.dev." : "am.logging."
+  }
+
+  influx_bucket_resolved = local.dig_shared ? "am_dev" : var.influx_bucket
+
+  mongo_uri_base = "mongodb://${urlencode(var.mongo_user)}:${urlencode(var.mongo_password)}@${local.mongo_host}:27017"
+  mongo_uri_auth = "${local.mongo_uri_base}/?authSource=admin&directConnection=true"
+  mongo_uri_for = {
+    for k, db in local.mongo_db : k => "${local.mongo_uri_base}/${db}?authSource=admin&directConnection=true"
+  }
+
+  # Shared Contabo dig principal name (same login as mongo/pg: dig_vault_seed).
+  redis_username = local.dig_shared ? var.mongo_user : ""
+  redis_url = local.dig_shared ? (
+    "redis://${urlencode(local.redis_username)}:${urlencode(var.redis_password)}@${local.redis_host}:6379/0"
+  ) : "redis://:${urlencode(var.redis_password)}@${local.redis_host}:6379/0"
 
   catalog = yamldecode(file("${path.module}/catalog/services.yaml"))
 
@@ -93,7 +161,7 @@ locals {
   ))
 
   # psycopg URLs for Python agents (qa-agent store)
-  qa_pg_url = "postgresql+psycopg://${var.postgres_user}:${var.postgres_password}@${local.pg_host}:5432/${var.postgres_db}"
+  qa_pg_url = "postgresql+psycopg://${var.postgres_user}:${var.postgres_password}@${local.pg_host}:5432/${local.qa_pg_db}"
 
   services_data = {
     for svc, keys in local.catalog_resolved : svc => merge(
@@ -105,12 +173,106 @@ locals {
         QA_AGENT_DATABASE_URL = local.qa_pg_url
         SPT_DATABASE_URL      = local.qa_pg_url
       } : {},
-      svc == "am-asrax-corp" || svc == "am-mkt-agents" ? {
-        MONGO_URI = "mongodb://${var.mongo_user}:${var.mongo_password}@${local.mongo_host}:27017/?authSource=admin&directConnection=true"
-      } : {},
-      # Fleet: minio-*.asrax.in was CF-proxied; empty → corp uses local attachments (health stays up)
       svc == "am-asrax-corp" ? {
+        MONGO_URI = local.mongo_uri_for.asrax_corp
+        MONGO_DB  = local.mongo_db.asrax_corp
         MINIO_ENDPOINT = ""
+      } : {},
+      svc == "am-mkt-agents" ? {
+        MONGO_URI = local.mongo_uri_for.mkt_agent
+        MONGO_DB  = local.mongo_db.mkt_agent
+      } : {},
+      # IAM: catalog hardcodes prod DB names/users; overlay env-suffixed / shared dig principals last.
+      svc == "am-user-platform" ? {
+        AM_USER_PLATFORM_DB_NAME     = local.infra_postgres.AM_USER_PLATFORM_DB_NAME
+        AM_USER_PLATFORM_DB_USER     = local.infra_postgres.AM_USER_PLATFORM_DB_USER
+        AM_USER_PLATFORM_DB_PASSWORD = local.infra_postgres.AM_USER_PLATFORM_DB_PASSWORD
+      } : {},
+      svc == "am-subscription" ? {
+        AM_SUBSCRIPTION_DB_NAME     = local.infra_postgres.AM_SUBSCRIPTION_DB_NAME
+        AM_SUBSCRIPTION_DB_USER     = local.infra_postgres.AM_SUBSCRIPTION_DB_USER
+        AM_SUBSCRIPTION_DB_PASSWORD = local.infra_postgres.AM_SUBSCRIPTION_DB_PASSWORD
+      } : {},
+      svc == "am-oms" ? {
+        AM_OMS_MONGO_URI      = local.mongo_uri_for.oms
+        AM_OMS_MONGO_DATABASE = local.mongo_db.oms
+        AM_OMS_DB_USER        = local.mongo_user_oms
+        AM_OMS_DB_PASSWORD    = local.mongo_pass_oms
+        KAFKA_TOPIC_PREFIX    = local.kafka_topic_prefix.oms
+      } : {},
+      svc == "am-notification" ? {
+        AM_NOTIFICATION_MONGO_URI      = local.mongo_uri_for.notification
+        AM_NOTIFICATION_MONGO_DATABASE = local.mongo_db.notification
+        AM_NOTIFICATION_DB_USER        = local.mongo_user_notification
+        AM_NOTIFICATION_DB_PASSWORD    = local.mongo_pass_notification
+        KAFKA_TOPIC_PREFIX             = local.kafka_topic_prefix.notification
+      } : {},
+      svc == "am-news" ? {
+        MONGO_DB               = local.mongo_db.news
+        MONGO_URI              = local.mongo_uri_for.news
+        MONGODB_DATABASE       = local.mongo_db.news
+        SPRING_DATA_MONGODB_DATABASE = local.mongo_db.news
+      } : {},
+      svc == "am-portfolio" ? {
+        MONGODB_DATABASE             = local.mongo_db.portfolio
+        SPRING_DATA_MONGODB_DATABASE = local.mongo_db.portfolio
+        MONGODB_DATABASE_NAME        = local.mongo_db.portfolio
+        REDIS_KEY_PREFIX             = local.redis_prefix.portfolio
+        KAFKA_TOPIC_PREFIX           = local.kafka_topic_prefix.portfolio
+      } : {},
+      svc == "am-trade-management" ? {
+        MONGODB_DATABASE             = local.mongo_db.trade
+        SPRING_DATA_MONGODB_DATABASE = local.mongo_db.trade
+        REDIS_KEY_PREFIX             = local.redis_prefix.trade
+        KAFKA_TOPIC_PREFIX           = local.kafka_topic_prefix.trade
+      } : {},
+      svc == "am-analysis" ? {
+        MONGODB_DATABASE             = local.mongo_db.analysis
+        SPRING_DATA_MONGODB_DATABASE = local.mongo_db.analysis
+        REDIS_KEY_PREFIX             = local.redis_prefix.analysis
+      } : {},
+      svc == "am-mcp-server" ? {
+        MONGODB_DATABASE             = local.mongo_db.mcp
+        SPRING_DATA_MONGODB_DATABASE = local.mongo_db.mcp
+        KAFKA_TOPIC_PREFIX           = local.kafka_topic_prefix.mcp
+      } : {},
+      svc == "am-document-processor" ? {
+        MONGODB_DATABASE             = local.mongo_db.doc_intel
+        SPRING_DATA_MONGODB_DATABASE = local.mongo_db.doc_intel
+        KAFKA_TOPIC_PREFIX           = local.kafka_topic_prefix.doc
+      } : {},
+      svc == "am-email-extractor" ? {
+        MONGODB_DATABASE             = local.mongo_db.doc_intel
+        SPRING_DATA_MONGODB_DATABASE = local.mongo_db.doc_intel
+        KAFKA_TOPIC_PREFIX           = local.kafka_topic_prefix.doc
+      } : {},
+      svc == "am-logging" || svc == "logging" ? {
+        MONGO_DB         = local.mongo_db.logging
+        MONGODB_DATABASE = local.mongo_db.logging
+        MONGO_URL        = local.mongo_uri_for.logging
+      } : {},
+      svc == "am-fin-agent" ? {
+        MONGO_DB         = local.mongo_db.fin_agent
+        DB_NAME          = local.mongo_db.fin_agent
+        MONGODB_DATABASE = local.mongo_db.fin_agent
+        MONGODB_URI      = local.mongo_uri_for.fin_agent
+      } : {},
+      svc == "am-market-data" ? {
+        MONGODB_DATABASE             = local.mongo_db.market_data
+        MONGODB_DATABASE_NAME        = local.mongo_db.market_data
+        SPRING_DATA_MONGODB_DATABASE = local.mongo_db.market_data
+        REDIS_KEY_PREFIX             = local.redis_prefix.market_data
+        KAFKA_TOPIC_PREFIX           = local.kafka_topic_prefix.market
+        INFLUXDB_BUCKET              = local.influx_bucket_resolved
+        SPRING_INFLUX_BUCKET         = local.influx_bucket_resolved
+      } : {},
+      svc == "am-parser" ? {
+        MONGODB_DATABASE             = local.mongo_db.mutual_funds
+        SPRING_DATA_MONGODB_DATABASE = local.mongo_db.mutual_funds
+      } : {},
+      svc == "am-engage" ? {
+        MONGO_URI = local.mongo_uri_for.engage
+        MONGO_DB  = local.mongo_db.engage
       } : {}
     )
   }
@@ -133,69 +295,107 @@ locals {
   }
 
   infra_postgres = {
-    host                       = local.pg_host
-    port                       = "5432"
-    database                   = var.postgres_db
-    username                   = var.postgres_user
-    password                   = var.postgres_password
-    url                        = "jdbc:postgresql://${local.pg_host}:5432/${var.postgres_db}"
-    DATABASE_URL               = "postgresql://${var.postgres_user}:${var.postgres_password}@${local.pg_host}:5432/${var.postgres_db}"
-    POSTGRES_HOST              = local.pg_host
-    POSTGRES_PORT              = "5432"
-    POSTGRES_USER              = var.postgres_user
-    POSTGRES_PASSWORD          = var.postgres_password
-    AM_USER_PLATFORM_DB_NAME   = var.env == "prod" ? "user_platform" : "user_platform_${var.env}"
-    AM_USER_PLATFORM_DB_USER   = local.pg_user_platform
+    host                         = local.pg_host
+    port                         = "5432"
+    database                     = local.dig_shared ? local.pg_db_platform : var.postgres_db
+    username                     = var.postgres_user
+    password                     = var.postgres_password
+    url                          = "jdbc:postgresql://${local.pg_host}:5432/${local.dig_shared ? local.pg_db_platform : var.postgres_db}"
+    DATABASE_URL                 = "postgresql://${var.postgres_user}:${var.postgres_password}@${local.pg_host}:5432/${local.dig_shared ? local.pg_db_platform : var.postgres_db}"
+    POSTGRES_HOST                = local.pg_host
+    POSTGRES_PORT                = "5432"
+    POSTGRES_USER                = var.postgres_user
+    POSTGRES_PASSWORD            = var.postgres_password
+    AM_USER_PLATFORM_DB_NAME     = local.pg_db_platform
+    AM_USER_PLATFORM_DB_USER     = local.pg_user_platform
     AM_USER_PLATFORM_DB_PASSWORD = local.pg_pass_platform
-    AM_SUBSCRIPTION_DB_NAME    = var.env == "prod" ? "am_subscription" : "am_subscription_${var.env}"
-    AM_SUBSCRIPTION_DB_USER    = local.pg_user_subscription
-    AM_SUBSCRIPTION_DB_PASSWORD = local.pg_pass_subscription
+    AM_SUBSCRIPTION_DB_NAME      = local.pg_db_subscription
+    AM_SUBSCRIPTION_DB_USER      = local.pg_user_subscription
+    AM_SUBSCRIPTION_DB_PASSWORD  = local.pg_pass_subscription
   }
 
-  infra_mongodb = {
-    host                         = local.mongo_host
-    port                         = "27017"
-    username                     = var.mongo_user
-    password                     = var.mongo_password
-    authSource                   = "admin"
-    url                          = "mongodb://${var.mongo_user}:${var.mongo_password}@${local.mongo_host}:27017/?authSource=admin&directConnection=true"
-    AM_OMS_MONGO_DATABASE        = var.env == "prod" ? "am_oms" : "am_oms_${var.env}"
-    AM_OMS_DB_USER               = local.mongo_user_oms
-    AM_OMS_DB_PASSWORD           = local.mongo_pass_oms
-    AM_NOTIFICATION_MONGO_DATABASE = var.env == "prod" ? "am_notification" : "am_notification_${var.env}"
-    AM_NOTIFICATION_DB_USER      = local.mongo_user_notification
-    AM_NOTIFICATION_DB_PASSWORD  = local.mongo_pass_notification
-  }
+  infra_mongodb = merge(
+    {
+      host                         = local.mongo_host
+      port                         = "27017"
+      username                     = var.mongo_user
+      password                     = var.mongo_password
+      authSource                   = "admin"
+      url                          = local.mongo_uri_auth
+      database                     = local.mongo_db.portfolio
+      AM_OMS_MONGO_DATABASE        = local.mongo_db.oms
+      AM_OMS_MONGO_URI             = local.mongo_uri_for.oms
+      AM_OMS_DB_USER               = local.mongo_user_oms
+      AM_OMS_DB_PASSWORD           = local.mongo_pass_oms
+      AM_NOTIFICATION_MONGO_DATABASE = local.mongo_db.notification
+      AM_NOTIFICATION_MONGO_URI    = local.mongo_uri_for.notification
+      AM_NOTIFICATION_DB_USER      = local.mongo_user_notification
+      AM_NOTIFICATION_DB_PASSWORD  = local.mongo_pass_notification
+      AM_PORTFOLIO_MONGO_DATABASE  = local.mongo_db.portfolio
+      AM_TRADE_MONGO_DATABASE      = local.mongo_db.trade
+      AM_ANALYSIS_MONGO_DATABASE   = local.mongo_db.analysis
+      AM_NEWS_MONGO_DATABASE       = local.mongo_db.news
+      AM_MCP_MONGO_DATABASE        = local.mongo_db.mcp
+      AM_DOC_INTEL_MONGO_DATABASE  = local.mongo_db.doc_intel
+      AM_LOGGING_MONGO_DATABASE    = local.mongo_db.logging
+      AM_ASRAX_CORP_MONGO_DATABASE = local.mongo_db.asrax_corp
+      AM_MKT_AGENT_MONGO_DATABASE  = local.mongo_db.mkt_agent
+      AM_ENGAGE_MONGO_DATABASE     = local.mongo_db.engage
+      AM_FIN_AGENT_MONGO_DATABASE  = local.mongo_db.fin_agent
+      AM_MARKET_DATA_MONGO_DATABASE = local.mongo_db.market_data
+      AM_PARSER_MONGO_DATABASE     = local.mongo_db.mutual_funds
+      AM_UI_TESTING_MONGO_DATABASE = local.mongo_db.ui_testing
+      MONGODB_DATABASE             = local.mongo_db.portfolio
+      SPRING_DATA_MONGODB_DATABASE = local.mongo_db.portfolio
+    }
+  )
 
-  infra_redis = {
-    host     = local.redis_host
-    port     = "6379"
-    password = var.redis_password
-    db       = "0"
-    url      = "redis://:${var.redis_password}@${local.redis_host}:6379/0"
-  }
+  infra_redis = merge(
+    {
+      host     = local.redis_host
+      port     = "6379"
+      password = var.redis_password
+      db       = "0"
+      url      = local.redis_url
+    },
+    local.dig_shared ? {
+      username       = local.redis_username
+      REDIS_USERNAME = local.redis_username
+      REDIS_PASSWORD = var.redis_password
+      key_prefix     = local.redis_prefix.market_data
+    } : {}
+  )
 
-  infra_kafka = {
-    bootstrap_servers      = local.kafka_host
-    username               = ""
-    password               = ""
-    sasl_mechanism         = "PLAIN"
-    security_protocol      = "PLAINTEXT"
-    KAFKA_SASL_MECHANISM   = "PLAIN"
-    KAFKA_SECURITY_PROTOCOL = "PLAINTEXT"
-  }
+  # Contabo dig: keep PLAINTEXT empty auth until brokers have SASL — only set topic prefixes.
+  # Non-empty username here would make apps attempt JAAS against PLAINTEXT brokers.
+  infra_kafka = merge(
+    {
+      bootstrap_servers       = local.kafka_host
+      username                = ""
+      password                = ""
+      sasl_mechanism          = "PLAIN"
+      security_protocol       = "PLAINTEXT"
+      KAFKA_SASL_MECHANISM    = "PLAIN"
+      KAFKA_SECURITY_PROTOCOL = "PLAINTEXT"
+    },
+    local.dig_shared ? {
+      topic_prefix       = local.kafka_topic_prefix.market
+      KAFKA_TOPIC_PREFIX = local.kafka_topic_prefix.market
+      isolation_note     = "prefix_convention_until_sasl"
+    } : {}
+  )
 
   infra_influxdb = {
     host            = local.influx_host
     port            = "443"
     org             = var.influx_org
-    bucket          = var.influx_bucket
+    bucket          = local.influx_bucket_resolved
     token           = var.influx_token
     password        = var.influx_password
     url             = "https://${local.influx_host}"
     INFLUXDB_URL    = "https://${local.influx_host}"
     INFLUXDB_ORG    = var.influx_org
-    INFLUXDB_BUCKET = var.influx_bucket
+    INFLUXDB_BUCKET = local.influx_bucket_resolved
     INFLUXDB_TOKEN  = var.influx_token
   }
 

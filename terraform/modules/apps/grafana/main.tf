@@ -16,11 +16,11 @@ locals {
     GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP         = "true"
     GF_AUTH_GENERIC_OAUTH_CLIENT_ID             = var.grafana_client_id
     GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET         = var.grafana_client_secret
-    GF_AUTH_GENERIC_OAUTH_SCOPES                = "openid profile email"
+    GF_AUTH_GENERIC_OAUTH_SCOPES                = "openid profile email roles groups"
     GF_AUTH_GENERIC_OAUTH_AUTH_URL              = "${trimsuffix(var.issuer_url, "/")}/protocol/openid-connect/auth"
     GF_AUTH_GENERIC_OAUTH_TOKEN_URL             = "${trimsuffix(var.issuer_url, "/")}/protocol/openid-connect/token"
     GF_AUTH_GENERIC_OAUTH_API_URL               = "${trimsuffix(var.issuer_url, "/")}/protocol/openid-connect/userinfo"
-    GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH   = "contains(roles[*], 'admin') && 'Admin' || contains(roles[*], 'am-admin') && 'Admin' || contains(roles[*], 'ops') && 'Editor' || contains(roles[*], 'am-ops') && 'Editor' || contains(roles[*], 'viewer') && 'Viewer' || contains(roles[*], 'am-viewer') && 'Viewer' || 'Viewer'"
+    GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH   = "contains(roles[*], 'access-grafana-admin') && 'Admin' || contains(roles[*], 'am-admin') && 'Admin' || contains(roles[*], 'admin') && 'Admin' || contains(roles[*], 'access-grafana-editor') && 'Editor' || contains(roles[*], 'am-ops') && 'Editor' || contains(roles[*], 'ops') && 'Editor' || contains(roles[*], 'access-grafana-viewer') && 'Viewer' || contains(roles[*], 'am-viewer') && 'Viewer' || contains(roles[*], 'viewer') && 'Viewer' || 'Viewer'"
     GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN            = "false"
     GF_USERS_VIEWERS_CAN_EXPLORE                = "true"
     GF_AUTH_DISABLE_LOGIN_FORM                  = var.disable_login_form ? "true" : "false"

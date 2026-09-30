@@ -10,7 +10,7 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: null
       GOOGLE_CLIENT_ID: null
       GOOGLE_CLIENT_SECRET: null
-      AM_IDENTITY_CLIENT_ID: "am-identity"
+      AM_IDENTITY_CLIENT_ID: "am-identity-service"
       AM_IDENTITY_CLIENT_SECRET: null
       AUTH_EMAIL_TOKEN_SECRET: null
       AUTH_EMAIL_TOKEN_TTL_SECONDS: "86400"
@@ -211,6 +211,11 @@ services:
       YOUTUBE_API_KEY: null
       MONGO_URI: null
       MONGO_DB: "am_mkt_agents"
+
+  am-engage:
+    keys:
+      MONGO_URI: null
+      MONGO_DB: "am_engage"
 
   am-resume:
     keys:

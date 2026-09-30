@@ -1,0 +1,67 @@
+name: Nonprod fleet origin (dev / preprod · VPS vs local)
+
+# Bulk-move *-dev or *-preprod tunnel CNAMEs between Contabo asrax-preprod (vps)
+# and laptop asrax-dev (local). Preprod also sets Workers KV nonprod/origin
+# (SoT for am-preprod.asrax.in Worker — that CNAME is never retargeted).
+#
+# See am-gitops/docs/NONPROD_DUAL.md and FAILOVER.md § Team triggers.
+# Break-glass: scripts/kind-fleet/nonprod-fleet-origin.sh
+#
+# GitHub Environments: nonprod-vps | nonprod-local
+# Secrets: CLOUDFLARE_API_TOKEN (required); optional CF_ACCOUNT_ID / CF_KV_NAMESPACE_ID
+
+on:
+  workflow_dispatch:
+    inputs:
+      plane:
+        description: Hostname set (dev = *-dev, preprod = KV + *-preprod backends)
+        required: true
+        type: choice
+        options:
+          - dev
+          - preprod
+      origin:
+        description: Target (vps = Contabo preprod tunnel, local = laptop dig tunnel)
+        required: true
+        type: choice
+        options:
+          - vps
+          - local
+      dry_run:
+        description: Print planned DNS/KV changes only
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  switch:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.origin == 'vps' && 'nonprod-vps' || 'nonprod-local' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Switch nonprod fleet origin
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+          PLANE: ${{ inputs.plane }}
+          ORIGIN: ${{ inputs.origin }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is empty. Set it on GitHub Environment nonprod-vps / nonprod-local."
+            exit 1
+          fi
+          chmod +x scripts/kind-fleet/nonprod-fleet-origin.sh
+          [[ -n "${CF_ACCOUNT_ID:-}" ]] || unset CF_ACCOUNT_ID
+          [[ -n "${CF_KV_NAMESPACE_ID:-}" ]] || unset CF_KV_NAMESPACE_ID
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            ./scripts/kind-fleet/nonprod-fleet-origin.sh "${PLANE}" "${ORIGIN}" --dry-run
+          else
+            ./scripts/kind-fleet/nonprod-fleet-origin.sh "${PLANE}" "${ORIGIN}"
+          fi

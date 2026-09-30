@@ -175,29 +175,13 @@ module "db_users" {
   redis_admin_password  = random_password.redis.result
   minio_admin_secret    = "minio-secret"
 
-  postgresql_app_users = {
-    keycloak              = { password = random_password.app_users["keycloak"].result, schemas = ["keycloak"] }
-    temporal              = { password = random_password.app_users["temporal"].result, schemas = ["temporal", "temporal_visibility"] }
-    lago                  = { password = random_password.app_users["lago"].result, schemas = ["lago"], database = "lago", createdb = true }
-    n8n                   = { password = random_password.app_users["n8n"].result, schemas = ["n8n"] }
-    openproject           = { password = random_password.app_users["openproject"].result, schemas = ["openproject"] }
-    litellm               = { password = random_password.app_users["litellm"].result, schemas = ["litellm"] }
-    langfuse              = { password = random_password.app_users["langfuse"].result, schemas = ["langfuse"] }
-    am_subscription_user  = { password = random_password.postgres.result, database = "am_subscription", createdb = true }
-    am_user_platform_user = { password = random_password.postgres.result, database = "user_platform", createdb = true }
-  }
-
-  mongodb_app_users = {
-    growthbook = { password = random_password.app_users["growthbook"].result, database = "platform", role = "readWrite" }
-  }
-
-  redis_users = {
-    langfuse = { password = random_password.app_users["langfuse"].result }
-  }
-
-  minio_users = {
-    langfuse = { password = random_password.app_users["langfuse"].result, prefix = "langfuse/" }
-  }
+  postgresql_app_users = local.catalog_postgresql_users
+  mongodb_app_users    = local.catalog_mongodb_users
+  redis_users          = local.catalog_redis_users
+  minio_users          = local.catalog_minio_users
+  kafka_users          = local.catalog_kafka_users
+  kafka_bootstrap      = ""
+  enable_inventory     = true
 
   depends_on = [
     module.postgresql,

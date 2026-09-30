@@ -44,6 +44,17 @@ locals {
   advertised_host = var.advertised_host != "" ? var.advertised_host : (
     var.environment == "prod" ? "kafka.${var.root_domain}" : "kafka-${var.environment}.${var.root_domain}"
   )
+
+  # Kafka-UI sidebar: local cluster is this plane; peer is the other fleet broker.
+  # Contabo prod apps (Vault env=prod) → kafka.asrax.in. Dig Contabo apps share that
+  # broker with *.dev. topic prefixes (store_hosts=contabo_prod). Laptop dig plane is kafka-dev.
+  ui_local_name = var.ui_cluster_name != "" ? var.ui_cluster_name : (
+    var.environment == "prod" ? "prod" : "dig"
+  )
+  ui_peer_name = var.environment == "prod" ? "dig" : "prod"
+  ui_peer_bootstrap = var.environment == "prod" ? coalesce(var.ui_bootstrap_dig, "kafka-dev.asrax.in:9092") : coalesce(var.ui_bootstrap_prod, "kafka.asrax.in:9092")
+  ui_preprod_bootstrap = coalesce(var.ui_bootstrap_preprod, "kafka-preprod.asrax.in:9092")
+  ui_dr_bootstrap      = coalesce(var.ui_bootstrap_dr, "kafka-dr.asrax.in:9092")
 }
 
 resource "kubernetes_service" "kafka" {
@@ -281,18 +292,32 @@ resource "helm_release" "kafka_ui" {
   namespace  = var.namespace
   version    = "0.7.5"
 
+  # Multi-env sidebar: env vars are authoritative (yaml alone often only loads cluster[0]).
+  # cluster[0] = this plane (prod Contabo or dig). cluster[1] = peer fleet broker.
   values = [yamlencode({
-    yamlApplicationConfig = {
-      kafka = {
-        clusters = [
-          {
-            name             = "local"
-            bootstrapServers = "kafka:9092"
-          }
-        ]
+    envs = {
+      config = {
+        KAFKA_CLUSTERS_0_NAME             = local.ui_local_name
+        KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS = "kafka:9092"
+        KAFKA_CLUSTERS_1_NAME             = local.ui_peer_name
+        KAFKA_CLUSTERS_1_BOOTSTRAPSERVERS = local.ui_peer_bootstrap
+        KAFKA_CLUSTERS_2_NAME             = "preprod"
+        KAFKA_CLUSTERS_2_BOOTSTRAPSERVERS = local.ui_preprod_bootstrap
+        KAFKA_CLUSTERS_3_NAME             = "dr"
+        KAFKA_CLUSTERS_3_BOOTSTRAPSERVERS = local.ui_dr_bootstrap
       }
+    }
+    yamlApplicationConfig = {
       auth = {
         type = "DISABLED"
+      }
+      kafka = {
+        clusters = [
+          { name = local.ui_local_name, bootstrapServers = "kafka:9092" },
+          { name = local.ui_peer_name, bootstrapServers = local.ui_peer_bootstrap },
+          { name = "preprod", bootstrapServers = local.ui_preprod_bootstrap },
+          { name = "dr", bootstrapServers = local.ui_dr_bootstrap },
+        ]
       }
     }
 

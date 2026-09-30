@@ -89,9 +89,10 @@ variable "redis_admin_password" {
 }
 
 variable "redis_users" {
-  description = "ACL users on the one Redis instance. Map: name => { password }"
+  description = "ACL users on the one Redis instance. Map: name => { password, key_prefix }"
   type = map(object({
-    password = string
+    password   = string
+    key_prefix = optional(string, "")
   }))
   default = {}
 }
@@ -103,6 +104,27 @@ variable "minio_users" {
     prefix   = optional(string, "")
   }))
   default = {}
+}
+
+variable "kafka_users" {
+  description = "Kafka SCRAM users (optional). Empty skips job. Map: name => { password, topic_prefix }"
+  type = map(object({
+    password     = string
+    topic_prefix = optional(string, "")
+  }))
+  default = {}
+}
+
+variable "kafka_bootstrap" {
+  description = "In-cluster Kafka bootstrap for SCRAM job. Empty disables kafka job even if kafka_users set."
+  type        = string
+  default     = ""
+}
+
+variable "enable_inventory" {
+  description = "Publish ConfigMap infra/db-users-inventory with principal counts and names."
+  type        = bool
+  default     = true
 }
 
 variable "mongodb_project_id" {

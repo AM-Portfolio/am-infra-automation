@@ -96,6 +96,8 @@ module "edge" {
     "litellm",
     "langfuse",
     "novu",
+    "bytebase",
+    "data",
     # Product UIs on apps Traefik (via apps-traefik-bridge on infra)
     "am",
     "corp",
@@ -126,6 +128,8 @@ module "edge" {
     "litellm",
     "langfuse",
     "novu",
+    "bytebase",
+    "data",
     "am",
     "corp",
     "asrax",
