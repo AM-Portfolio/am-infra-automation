@@ -64,8 +64,8 @@ variable "argo_kube_context" {
 
 variable "kind_api_origin" {
   type        = string
-  default     = "https://host.docker.internal:6444"
-  description = "Origin for edge extra_origin_ingress (Kind apiserver as seen by cloudflared on dig host)."
+  default     = "http://kubeapi-proxy.infra.svc.cluster.local:80"
+  description = "Origin for edge extra_origin_ingress. HTTP kubeapi-proxy on am-dev-apps (not direct kube HTTPS)."
 }
 
 provider "cloudflare" {

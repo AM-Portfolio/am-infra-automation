@@ -51,8 +51,12 @@ module "edge" {
     "prometheus",
   ]
   # Additive Kind API hostname (DNS owned by kind-fleet/dev/argo-kubeapi).
+  # Origin must be kubeapi-proxy on am-dev-apps (see kind-fleet/dev/apps/kubeapi-proxy.tf).
   extra_origin_ingress = var.enable_kubeapi_ingress && var.kubeapi_kind_api_origin != "" ? {
     "kubeapi-dev.asrax.in" = var.kubeapi_kind_api_origin
+  } : {}
+  extra_origin_http_host_header = var.enable_kubeapi_ingress && var.kubeapi_kind_api_origin != "" ? {
+    "kubeapi-dev.asrax.in" = var.kubeapi_http_host_header
   } : {}
 }
 

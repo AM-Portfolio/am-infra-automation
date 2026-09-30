@@ -33,9 +33,14 @@ variable "cloudflare_account_id" {
 }
 
 variable "kubeapi_kind_api_origin" {
-  description = "Additive tunnel origin for kubeapi-prod.asrax.in (Kind am-prod-apps API). Empty = omit."
+  description = "Tunnel origin for kubeapi-prod.asrax.in — HTTP kubeapi-proxy on am-prod-apps (not 127.0.0.1 / direct kube HTTPS)."
   type        = string
-  default     = "https://127.0.0.1:6443"
+  default     = "http://kubeapi-proxy.infra.svc.cluster.local:80"
+}
+
+variable "kubeapi_http_host_header" {
+  type    = string
+  default = "kubernetes.default.svc"
 }
 
 variable "enable_kubeapi_ingress" {
@@ -138,6 +143,9 @@ module "edge" {
   # Additive Kind API hostname (DNS owned by kind-fleet/prod/argo-kubeapi).
   extra_origin_ingress = var.enable_kubeapi_ingress && var.kubeapi_kind_api_origin != "" ? {
     "kubeapi-prod.asrax.in" = var.kubeapi_kind_api_origin
+  } : {}
+  extra_origin_http_host_header = var.enable_kubeapi_ingress && var.kubeapi_kind_api_origin != "" ? {
+    "kubeapi-prod.asrax.in" = var.kubeapi_http_host_header
   } : {}
 }
 

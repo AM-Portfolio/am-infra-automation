@@ -1,0 +1,107 @@
+# Contabo Argo → Cloudflare Tunnel → this proxy → https://kubernetes.default.svc
+# Applied by host ensure container (am-kubeapi-proxy-ensure) and/or terraform module.
+# Requires namespace `infra` (edge/cloudflared). Do not include Namespace here (RBAC).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeapi-proxy-nginx
+  namespace: infra
+  labels:
+    app: kubeapi-proxy
+data:
+  nginx.conf: |
+    worker_processes 1;
+    error_log /dev/stderr warn;
+    events { worker_connections 1024; }
+    http {
+      access_log /dev/stdout;
+      server {
+        listen 80;
+        location / {
+          proxy_http_version 1.1;
+          proxy_set_header Host $host;
+          proxy_set_header Authorization $http_authorization;
+          proxy_set_header Connection "";
+          proxy_ssl_server_name on;
+          proxy_ssl_verify off;
+          proxy_buffering off;
+          proxy_request_buffering off;
+          proxy_read_timeout 3600s;
+          proxy_send_timeout 3600s;
+          proxy_connect_timeout 30s;
+          proxy_pass https://kubernetes.default.svc;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeapi-proxy
+  namespace: infra
+  labels:
+    app: kubeapi-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubeapi-proxy
+  template:
+    metadata:
+      labels:
+        app: kubeapi-proxy
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.27-alpine
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: conf
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        resources:
+          requests:
+            cpu: 20m
+            memory: 32Mi
+          limits:
+            cpu: 200m
+            memory: 64Mi
+        livenessProbe:
+          httpGet:
+            path: /version
+            port: 80
+            httpHeaders:
+            - name: Host
+              value: kubernetes.default.svc
+          initialDelaySeconds: 5
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /version
+            port: 80
+            httpHeaders:
+            - name: Host
+              value: kubernetes.default.svc
+          initialDelaySeconds: 3
+          periodSeconds: 10
+      volumes:
+      - name: conf
+        configMap:
+          name: kubeapi-proxy-nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubeapi-proxy
+  namespace: infra
+  labels:
+    app: kubeapi-proxy
+spec:
+  selector:
+    app: kubeapi-proxy
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80

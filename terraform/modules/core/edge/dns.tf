@@ -46,7 +46,8 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "edge" {
         service  = ingress_rule.value
 
         origin_request {
-          no_tls_verify = true
+          no_tls_verify    = true
+          http_host_header = lookup(var.extra_origin_http_host_header, ingress_rule.key, null)
         }
       }
     }

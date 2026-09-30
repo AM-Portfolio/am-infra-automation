@@ -22,6 +22,13 @@ echo "== kind-fleet-boot ENV=$ENV_NAME =="
 echo "== 1 ensure-port-exposer =="
 bash "$ROOT/ensure-port-exposer.sh" "$ENV_NAME"
 
+echo "== 1b ensure-kubeapi-proxy =="
+if [[ -x "$ROOT/ensure-kubeapi-proxy.sh" ]] || [[ -f "$ROOT/ensure-kubeapi-proxy.sh" ]]; then
+  bash "$ROOT/ensure-kubeapi-proxy.sh" "$ENV_NAME" || echo "WARN: kubeapi-proxy ensure failed (continue)"
+else
+  echo "WARN: missing ensure-kubeapi-proxy.sh"
+fi
+
 echo "== 2 refresh-cross-cluster-bridges =="
 if [[ -x "$ROOT/refresh-cross-cluster-bridges.sh" ]]; then
   bash "$ROOT/refresh-cross-cluster-bridges.sh" "$ENV_NAME" || echo "WARN: bridges refresh failed (continue)"

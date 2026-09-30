@@ -13,6 +13,10 @@ In-cluster resolution of store/Temporal FQDNs → `am-port-exposer` IP via CoreD
 | `refresh-exposer-coredns.sh` | Apps CoreDNS hosts → exposer IP |
 | `refresh-exposer-hostaliases.sh` | Compat wrapper → coredns script |
 | `ensure-port-exposer.sh` | Recreate exposer if store/Temporal ports closed |
+| `ensure-kubeapi-proxy.sh` | Host Docker `am-kubeapi-proxy-ensure` (--restart always) applies kubeapi-proxy when Kind is up |
+| `kubeapi-proxy-ensure-loop.sh` | Loop script mounted into that ensure container |
+
+Docs: [KUBEAPI_PROXY.md](../../docs/kind-fleet-clusters/KUBEAPI_PROXY.md)
 | `kind-fleet-boot.sh` | Ordered boot: ensure → bridges → CoreDNS → smoke |
 | `systemd/am-refresh-bridges.*` | Timer every 2 min |
 | `systemd/am-refresh-exposer-hostaliases.*` | Timer every 2 min (CoreDNS) |

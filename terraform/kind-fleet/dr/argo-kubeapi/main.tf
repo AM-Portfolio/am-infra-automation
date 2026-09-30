@@ -60,8 +60,8 @@ variable "argo_kube_context" {
 
 variable "kind_api_origin" {
   type        = string
-  default     = "https://127.0.0.1:6443"
-  description = "Kind am-dr-apps apiserver as seen by DR cloudflared."
+  default     = "http://kubeapi-proxy.infra.svc.cluster.local:80"
+  description = "HTTP kubeapi-proxy on am-dr-apps (not direct kube HTTPS / 127.0.0.1)."
 }
 
 provider "cloudflare" {

@@ -77,9 +77,18 @@ variable "break_glass_emails" {
 }
 
 variable "kubeapi_kind_api_origin" {
-  description = "Additive tunnel origin for kubeapi-dev.asrax.in (Kind am-dev-apps API). Empty = omit rule."
+  description = <<-EOT
+    Additive tunnel origin for kubeapi-dev.asrax.in (as seen by cloudflared on am-dev-apps).
+    Must be HTTP kubeapi-proxy — not https://kubernetes.default.svc (bearer 401 via CF).
+  EOT
   type        = string
-  default     = "https://host.docker.internal:6444"
+  default     = "http://kubeapi-proxy.infra.svc.cluster.local:80"
+}
+
+variable "kubeapi_http_host_header" {
+  description = "Host header cloudflared sends to kubeapi-proxy origin (kube apiserver SNI/Host)."
+  type        = string
+  default     = "kubernetes.default.svc"
 }
 
 variable "enable_kubeapi_ingress" {

@@ -34,6 +34,8 @@ chmod +x \
   "$SRC/refresh-exposer-coredns.sh" \
   "$SRC/refresh-exposer-hostaliases.sh" \
   "$SRC/ensure-port-exposer.sh" \
+  "$SRC/ensure-kubeapi-proxy.sh" \
+  "$SRC/kubeapi-proxy-ensure-loop.sh" \
   "$SRC/kind-fleet-boot.sh" \
   2>/dev/null || true
 
