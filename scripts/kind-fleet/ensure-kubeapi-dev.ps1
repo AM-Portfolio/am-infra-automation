@@ -14,6 +14,11 @@
   3) Patch Contabo Argo secret cluster-am-dev-apps
   4) Probe Contabo bearer auth
 
+  Contabo Approve hang / Argo am-dev-apps Failed / Contabo curl kubeapi-dev → CF 502
+  while laptop curl → 200: dig cloudflared connectors are stale (proxy+tunnel OK).
+  Fix: kubectl --kubeconfig ~/.asrax/kubeconfig.dev.local -n infra rollout restart deploy/cloudflared
+  then re-run this script until probe prints bearer=200. See docs/kind-fleet-clusters/KUBEAPI_PROXY.md.
+
   SoT: kind-fleet/dev/apps/kubeapi-proxy.tf + kubeapi-proxy-ensure.tf
 
 .EXAMPLE
@@ -21,6 +26,7 @@
 #>
 $ErrorActionPreference = "Stop"
 $DevKc = Join-Path $env:USERPROFILE ".asrax\kubeconfig.dev"
+$DevKcLocal = Join-Path $env:USERPROFILE ".asrax\kubeconfig.dev.local"
 $ProdKc = Join-Path $env:USERPROFILE ".asrax\kubeconfig.prod"
 $ObsEnv = Join-Path $env:USERPROFILE ".asrax\credentials.d\observability.env"
 $TunnelId = "d652365f-bdb2-4382-a4e1-28b628bcf5d3"
@@ -37,7 +43,12 @@ function Use-Ctx([string]$kc, [string]$want) {
 }
 
 Write-Host "== 1) kubeapi-proxy on am-dev-apps =="
-Use-Ctx $DevKc "dev-apps"
+# Prefer host-only local kubeconfig (tunnel cannot heal itself).
+if (Test-Path $DevKcLocal) {
+  Use-Ctx $DevKcLocal "dev-apps-local"
+} else {
+  Use-Ctx $DevKc "dev-apps"
+}
 
 $yamlPath = Join-Path $TmpDir "kubeapi-proxy.yaml"
 @'

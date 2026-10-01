@@ -2,6 +2,8 @@
 
 Contabo main Argo talks to laptop Kind **`am-dev-apps`** through Cloudflare Tunnel hostname **`kubeapi-dev.asrax.in`**.
 
+Operator `~/.asrax/kubeconfig.dev` uses the **same** hostname (bearer token) so other laptops can kubectl without localhost Kind. Host-only break-glass: `~/.asrax/kubeconfig.dev.local` (`127.0.0.1:6444`). Rebuild: `python scripts/kind-fleet/refresh-kubeconfig-dev-tunnel.py`.
+
 **Never** point the tunnel at `https://kubernetes.default.svc` directly. Cloudflare / TLS termination breaks Kubernetes bearer auth → Contabo Approve **401 / 500 / 403** (`failed to discover server resources`).
 
 ## Working path
@@ -66,10 +68,12 @@ Bearer discover from Contabo must return **200** with a non-empty `APIGroupList`
 | Contabo Approve | Likely cause |
 |-----------------|--------------|
 | **401** | Tunnel still HTTPS to kube API (no kubeapi-proxy) |
+| **Hang** pin OK but never Healthy; Argo `am-dev-apps` **Failed**; Contabo `curl kubeapi-dev` **502** while laptop **200** | dig `cloudflared` connectors stale — `kubectl --kubeconfig ~/.asrax/kubeconfig.dev.local -n infra rollout restart deploy/cloudflared`, then `scripts/kind-fleet/ensure-kubeapi-dev.ps1` until `bearer=200` |
 | **500** EOF / server version | Kind / tunnel blip — retries in `am-pipelines` `argo-api-lib.sh` |
 | **500** `lookup kubeapi-dev… server misbehaving` | Contabo Kind **CoreDNS** upstream (Docker `172.18.0.1`) broken — pin `forward . 8.8.8.8 8.8.4.4` via `terraform/kind-fleet/scripts/ensure-kind-host-dns.sh` (also sets Docker `daemon.json` dns + Kind node `/etc/resolv.conf`) |
 | **403** discover zero resources | Same path broken or secret token stale; fix proxy+tunnel then refresh `cluster-am-dev-apps` |
 | **504** | nginx/CF watch timeout — ensure long `proxy_read_timeout` |
+| **ImagePullBackOff** `…/<service>:<tag>` not found | Flat GHCR path — Contabo CI publishes `ghcr.io/am-portfolio/<git-repo>/<service>`; pin must set `image.repository` (see am-gitops `set-image-tag.yml`) |
 
 After path is healthy, **ImagePullBackOff** on the destination is often the same Docker/Tailscale DNS failure on the Kind node (`lookup ghcr.io on 172.18.0.1:53 server misbehaving`). Run as root on the VPS:
 
@@ -78,6 +82,21 @@ ENV=prod bash terraform/kind-fleet/scripts/ensure-kind-host-dns.sh --restart-doc
 ```
 
 That writes durable `dns: ["8.8.8.8","8.8.4.4"]` (survives Tailscale/host resolv churn), patches live Kind node resolv, and pins CoreDNS forward. Hooked from `kind-fleet-boot.sh` (without docker restart). Separate GHCR **403** after DNS is fixed means PAT/`ghcr-creds` ACL.
+
+## Kind node NotReady (host inotify)
+
+If a Kind docker node (`am-<env>-infra-worker`, etc.) is **NotReady** with kubelet `NodeStatusUnknown`, and `docker logs` shows systemd PID1 **`Too many open files` / `Failed to create control group inotify object`**, raise host inotify and restart **only that container** — never `kind delete`:
+
+```bash
+# Contabo / VPS root — also step 0 of kind-fleet-boot.sh
+ENV=prod ASRAX_HOME=/home/am-ops/.asrax bash terraform/kind-fleet/scripts/ensure-kind-node-ready.sh
+# or after boot scripts sync:
+ENV=prod bash /root/am-repos/am-infra-automation/terraform/kind-fleet/scripts/kind-fleet-boot.sh
+```
+
+`ensure-kind-node-ready.sh` persists `fs.inotify.max_user_watches` / `max_user_instances` under `/etc/sysctl.d/99-kind-inotify.conf` and `docker restart`s exited/NotReady Kind node containers.
+
+Also: `refresh-exposer-coredns.sh` patches **apps and infra** CoreDNS hosts → exposer IP. Infra Keycloak talks to `postgres.asrax.in`; without the infra hosts entry it hairpins to the public VPS IP and times out.
 
 ## Related CI: Contabo Approve 403 discover
 
@@ -89,12 +108,18 @@ That means Contabo Argo could not list the Kind API via `kubeapi-dev.asrax.in` (
 
 If Contabo sync succeeds but pods stay **ImagePullBackOff** with GHCR **403**:
 
-1. Cluster secret may hold an **expired classic `ghp_` PAT** while SoT is a fine-grained `github_` token in `~/.asrax/credentials.env`. Refresh:
+1. **SoT is Vault** `apps/data/prod/infra/ghcr` (`username` + `token`). In-cluster CronJob `ghcr-pull-secret-sync` (every 30m + boot via `ensure-ghcr-pull-secrets.sh`) writes `ghcr-creds` / `github-registry-secret` / `regcred` in `am-apps-prod`, `am-agents-prod`, `edge`.
 
 ```bash
-# from laptop with kubeconfig.prod → prod-apps
-python am-infra-automation/scripts/kind-fleet/refresh-ghcr-pull-secrets.py
-# Contabo SoT for TF: /data/am-state/credentials/credentials.env (must include GHCR_TOKEN)
+# Seed / rotate token into Vault (infra context), then sync
+$env:KUBECONFIG="$HOME/.asrax/kubeconfig.prod"
+kubectl config use-context prod-infra
+python am-infra-automation/scripts/kind-fleet/seed-vault-ghcr.py --env prod
+kubectl config use-context prod-apps
+bash am-infra-automation/terraform/kind-fleet/scripts/ensure-ghcr-pull-secrets.sh prod
+# Or one-shot from Vault without CronJob:
+# (infra) python …/refresh-ghcr-pull-secrets.py --vault
+# Contabo credentials SoT for TF seed: /data/am-state/credentials/credentials.env
 ```
 
-2. After refresh, if some packages still **403** but others pull: fine-grained PAT lacks package/repo access for those images — expand FG token to **All repositories** + Packages read, or use a classic PAT with `read:packages`, then re-run the refresh script.
+2. After sync, if packages still **403**: the PAT in Vault lacks package access — use classic `read:packages` or FG **Packages: Read** + AM-Portfolio packages, update `GHCR_TOKEN` in credentials.env, re-run `seed-vault-ghcr.py`, then `ensure-ghcr-pull-secrets.sh` (or wait for CronJob).
