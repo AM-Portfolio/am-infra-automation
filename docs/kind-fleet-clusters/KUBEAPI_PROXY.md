@@ -67,11 +67,17 @@ Bearer discover from Contabo must return **200** with a non-empty `APIGroupList`
 |-----------------|--------------|
 | **401** | Tunnel still HTTPS to kube API (no kubeapi-proxy) |
 | **500** EOF / server version | Kind / tunnel blip — retries in `am-pipelines` `argo-api-lib.sh` |
-| **500** `lookup kubeapi-dev… server misbehaving` | Contabo Kind **CoreDNS** upstream (Docker `172.18.0.1`) broken — pin `forward . 1.1.1.1 8.8.8.8` and/or `hosts` for `kubeapi-dev.asrax.in` on Contabo `kube-system/coredns` |
+| **500** `lookup kubeapi-dev… server misbehaving` | Contabo Kind **CoreDNS** upstream (Docker `172.18.0.1`) broken — pin `forward . 8.8.8.8 8.8.4.4` via `terraform/kind-fleet/scripts/ensure-kind-host-dns.sh` (also sets Docker `daemon.json` dns + Kind node `/etc/resolv.conf`) |
 | **403** discover zero resources | Same path broken or secret token stale; fix proxy+tunnel then refresh `cluster-am-dev-apps` |
 | **504** | nginx/CF watch timeout — ensure long `proxy_read_timeout` |
 
-After path is healthy, **ImagePullBackOff** on the destination is a separate GHCR / `imagePullSecrets` problem (not kubeapi-proxy).
+After path is healthy, **ImagePullBackOff** on the destination is often the same Docker/Tailscale DNS failure on the Kind node (`lookup ghcr.io on 172.18.0.1:53 server misbehaving`). Run as root on the VPS:
+
+```bash
+ENV=prod bash terraform/kind-fleet/scripts/ensure-kind-host-dns.sh --restart-docker
+```
+
+That writes durable `dns: ["8.8.8.8","8.8.4.4"]` (survives Tailscale/host resolv churn), patches live Kind node resolv, and pins CoreDNS forward. Hooked from `kind-fleet-boot.sh` (without docker restart). Separate GHCR **403** after DNS is fixed means PAT/`ghcr-creds` ACL.
 
 ## Related CI: Contabo Approve 403 discover
 
@@ -81,4 +87,14 @@ Example: [am-gateways run 36713529833](https://github.com/AM-Portfolio/am-gatewa
 
 That means Contabo Argo could not list the Kind API via `kubeapi-dev.asrax.in` (tunnel/proxy blip). Fix path (proxy + ensure), then re-approve. `am-pipelines` `argo-api-lib.sh` now also retries that 403 class.
 
-If Contabo sync succeeds but pods stay **ImagePullBackOff** with GHCR **403**: PAT/`ghcr-creds` lacks pull on package `am-ai-gateway` (node may still have older tags cached — `imagePullPolicy: Always` will keep failing until package ACL / token is fixed).
+If Contabo sync succeeds but pods stay **ImagePullBackOff** with GHCR **403**:
+
+1. Cluster secret may hold an **expired classic `ghp_` PAT** while SoT is a fine-grained `github_` token in `~/.asrax/credentials.env`. Refresh:
+
+```bash
+# from laptop with kubeconfig.prod → prod-apps
+python am-infra-automation/scripts/kind-fleet/refresh-ghcr-pull-secrets.py
+# Contabo SoT for TF: /data/am-state/credentials/credentials.env (must include GHCR_TOKEN)
+```
+
+2. After refresh, if some packages still **403** but others pull: fine-grained PAT lacks package/repo access for those images — expand FG token to **All repositories** + Packages read, or use a classic PAT with `read:packages`, then re-run the refresh script.

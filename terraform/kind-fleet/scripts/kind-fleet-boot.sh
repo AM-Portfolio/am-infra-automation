@@ -36,6 +36,21 @@ else
   echo "WARN: missing refresh-cross-cluster-bridges.sh"
 fi
 
+echo "== 2b ensure-kind-host-dns (daemon.json + node resolv + CoreDNS upstream) =="
+if [[ -f "$ROOT/ensure-kind-host-dns.sh" ]]; then
+  # No --restart-docker on boot: nodes already up; patch resolv + CoreDNS in place.
+  bash "$ROOT/ensure-kind-host-dns.sh" "$ENV_NAME" || echo "WARN: ensure-kind-host-dns failed (continue)"
+else
+  echo "WARN: missing ensure-kind-host-dns.sh"
+fi
+
+echo "== 2c ensure-vault-k8s-apps-auth (G25 TokenReview host after Docker churn) =="
+if [[ -f "$ROOT/ensure-vault-k8s-apps-auth.sh" ]]; then
+  bash "$ROOT/ensure-vault-k8s-apps-auth.sh" "$ENV_NAME" || echo "WARN: ensure-vault-k8s-apps-auth failed (continue)"
+else
+  echo "WARN: missing ensure-vault-k8s-apps-auth.sh"
+fi
+
 echo "== 3 refresh-exposer-coredns =="
 if [[ -x "$ROOT/refresh-exposer-coredns.sh" ]]; then
   bash "$ROOT/refresh-exposer-coredns.sh" "$ENV_NAME" || echo "WARN: CoreDNS exposer hosts refresh failed (continue)"

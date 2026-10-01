@@ -33,6 +33,8 @@ chmod +x \
   "$SRC/refresh-cross-cluster-bridges.sh" \
   "$SRC/refresh-exposer-coredns.sh" \
   "$SRC/refresh-exposer-hostaliases.sh" \
+  "$SRC/ensure-kind-host-dns.sh" \
+  "$SRC/ensure-vault-k8s-apps-auth.sh" \
   "$SRC/ensure-port-exposer.sh" \
   "$SRC/ensure-kubeapi-proxy.sh" \
   "$SRC/kubeapi-proxy-ensure-loop.sh" \

@@ -122,8 +122,25 @@ else:
     insert = block + "\n    "
     new_core = corefile[: m.start()] + insert + corefile[m.start() :]
 
+# Pin upstream away from node /etc/resolv.conf (Docker bridge DNS / Tailscale MagicDNS
+# breaks public lookups → ImagePullBackOff). Public resolvers are IP-stable.
+dns1 = os.environ.get("AM_DOCKER_DNS1", "8.8.8.8")
+dns2 = os.environ.get("AM_DOCKER_DNS2", "8.8.4.4")
+fwd_pat = re.compile(
+    r"(^[ \t]*)forward[ \t]+\.[ \t]+[^\n{]*(?:\{[^{}]*\})?",
+    re.MULTILINE,
+)
+
+def _fwd_repl(m):
+    indent = m.group(1)
+    return f"{indent}forward . {dns1} {dns2} {{\n{indent}   max_concurrent 1000\n{indent}}}"
+
+new_core2, fwd_n = fwd_pat.subn(_fwd_repl, new_core, count=1)
+if fwd_n:
+    new_core = new_core2
+
 if new_core == corefile:
-    print(f"coredns hosts already ok exposer={exposer} env={env}")
+    print(f"coredns hosts+forward already ok exposer={exposer} env={env}")
     sys.exit(0)
 
 # Apply via kubectl patch of data.Corefile
@@ -136,7 +153,7 @@ try:
 finally:
     os.unlink(path)
 
-print(f"patched kube-system/coredns hosts -> {exposer} ({env})")
+print(f"patched kube-system/coredns hosts -> {exposer} ({env}); forward . {dns1} {dns2}")
 # Force reload (Kind CoreDNS reload may lag)
 run(["kubectl", "-n", "kube-system", "rollout", "restart", "deployment/coredns"], check=False)
 run(["kubectl", "-n", "kube-system", "rollout", "status", "deployment/coredns", "--timeout=90s"], check=False)
