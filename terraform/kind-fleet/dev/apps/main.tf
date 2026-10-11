@@ -32,7 +32,7 @@ module "cluster" {
   # Applying this against an existing one-node Kind replaces the cluster — prefer
   # scripts/tmp-dev-apps-split-workers.ps1 to join workers in place first.
   node_shape      = "split"
-  oidc_issuer_url = "https://auth-dev.asrax.in/realms/am-realm"
+  oidc_issuer_url = "https://auth.asrax.in/realms/am-dev-realm"
   oidc_client_id  = "kubectl"
 }
 

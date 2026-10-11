@@ -1,0 +1,237 @@
+# Durable GHCR pull-secret sync: Vault apps/data/<env>/infra/ghcr → kube dockerconfigjson.
+# Apply on Contabo apps cluster (prod-apps). Uses am-backend-sa + kubernetes-apps Vault auth via CSI.
+# Sync container is curlimages/curl (public) — talks to kube API with the SA token (no kubectl image).
+---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: ghcr-pull-sync
+  namespace: am-apps-prod
+  labels:
+    app.kubernetes.io/name: ghcr-pull-sync
+    app.kubernetes.io/part-of: am-kind-fleet
+spec:
+  provider: vault
+  parameters:
+    roleName: am-backend-role
+    vaultAddress: https://vault.asrax.in
+    vaultAuthMountPath: kubernetes-apps
+    vaultCACertGen: "false"
+    objects: |
+      - objectName: "username"
+        secretPath: "apps/data/prod/infra/ghcr"
+        secretKey: "username"
+      - objectName: "token"
+        secretPath: "apps/data/prod/infra/ghcr"
+        secretKey: "token"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ghcr-pull-secret-sync
+  labels:
+    app.kubernetes.io/name: ghcr-pull-sync
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ghcr-pull-secret-sync
+  labels:
+    app.kubernetes.io/name: ghcr-pull-sync
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ghcr-pull-secret-sync
+subjects:
+  - kind: ServiceAccount
+    name: am-backend-sa
+    namespace: am-apps-prod
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ghcr-pull-sync-script
+  namespace: am-apps-prod
+  labels:
+    app.kubernetes.io/name: ghcr-pull-sync
+data:
+  sync.sh: |
+    #!/bin/sh
+    set -eu
+    USER_F="${GHCR_USER_FILE:-/mnt/ghcr/username}"
+    TOK_F="${GHCR_TOKEN_FILE:-/mnt/ghcr/token}"
+    NS_LIST="${GHCR_NS:-am-apps-prod,am-agents-prod,edge}"
+    NAMES="${GHCR_SECRET_NAMES:-ghcr-creds,github-registry-secret,regcred}"
+    APISERVER="${APISERVER:-https://kubernetes.default.svc}"
+    SA=/var/run/secrets/kubernetes.io/serviceaccount
+    TOKEN=$(cat "$SA/token")
+    CACERT="$SA/ca.crt"
+
+    if [ ! -s "$USER_F" ] || [ ! -s "$TOK_F" ]; then
+      echo "ERROR: missing Vault-mounted ghcr username/token under /mnt/ghcr" >&2
+      ls -la /mnt/ghcr || true
+      exit 1
+    fi
+    USER=$(tr -d '\r\n' < "$USER_F")
+    TOK=$(tr -d '\r\n' < "$TOK_F")
+    echo "sync user=${USER} token_len=${#TOK} ns=${NS_LIST}"
+
+    AUTH=$(printf '%s:%s' "$USER" "$TOK" | base64 | tr -d '\n')
+    # Minimal JSON escape for " \ 
+    json_escape() {
+      printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+    }
+    U_ESC=$(json_escape "$USER")
+    T_ESC=$(json_escape "$TOK")
+    CFG=$(printf '{"auths":{"ghcr.io":{"username":"%s","password":"%s","auth":"%s"}}}' "$U_ESC" "$T_ESC" "$AUTH")
+    CFG_B64=$(printf '%s' "$CFG" | base64 | tr -d '\n')
+
+    apply_secret() {
+      ns="$1"
+      name="$2"
+      body=$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"%s","namespace":"%s"},"type":"kubernetes.io/dockerconfigjson","data":{".dockerconfigjson":"%s"}}' "$name" "$ns" "$CFG_B64")
+      code=$(curl -sS -o /tmp/kresp.json -w "%{http_code}" \
+        --cacert "$CACERT" -H "Authorization: Bearer ${TOKEN}" \
+        -H "Content-Type: application/json" \
+        -X POST "${APISERVER}/api/v1/namespaces/${ns}/secrets" \
+        -d "$body" || echo 000)
+      if [ "$code" = "201" ] || [ "$code" = "200" ]; then
+        echo "created ${ns}/${name} http=${code}"
+        return 0
+      fi
+      if [ "$code" = "409" ]; then
+        code=$(curl -sS -o /tmp/kresp.json -w "%{http_code}" \
+          --cacert "$CACERT" -H "Authorization: Bearer ${TOKEN}" \
+          -H "Content-Type: application/json" \
+          -X PUT "${APISERVER}/api/v1/namespaces/${ns}/secrets/${name}" \
+          -d "$body" || echo 000)
+        echo "replaced ${ns}/${name} http=${code}"
+        [ "$code" = "200" ] || [ "$code" = "201" ]
+        return $?
+      fi
+      echo "ERROR ${ns}/${name} http=${code} body=$(head -c 200 /tmp/kresp.json)" >&2
+      return 1
+    }
+
+    ns_exists() {
+      code=$(curl -sS -o /dev/null -w "%{http_code}" \
+        --cacert "$CACERT" -H "Authorization: Bearer ${TOKEN}" \
+        "${APISERVER}/api/v1/namespaces/$1" || echo 000)
+      [ "$code" = "200" ]
+    }
+
+    fail=0
+    OLDIFS=$IFS
+    IFS=,
+    for ns in $NS_LIST; do
+      ns=$(echo "$ns" | tr -d ' ')
+      [ -n "$ns" ] || continue
+      if ! ns_exists "$ns"; then
+        echo "skip missing ns=$ns"
+        continue
+      fi
+      for name in $NAMES; do
+        name=$(echo "$name" | tr -d ' ')
+        apply_secret "$ns" "$name" || fail=1
+      done
+    done
+    IFS=$OLDIFS
+    [ "$fail" -eq 0 ]
+    echo "ghcr-pull-sync OK"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ghcr-pull-secret-sync
+  namespace: am-apps-prod
+  labels:
+    app.kubernetes.io/name: ghcr-pull-sync
+    app.kubernetes.io/part-of: am-kind-fleet
+spec:
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: ghcr-pull-sync
+        spec:
+          serviceAccountName: am-backend-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: sync
+              image: curlimages/curl:8.11.1
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "/scripts/sync.sh"]
+              volumeMounts:
+                - name: ghcr
+                  mountPath: /mnt/ghcr
+                  readOnly: true
+                - name: script
+                  mountPath: /scripts
+                  readOnly: true
+          volumes:
+            - name: ghcr
+              csi:
+                driver: secrets-store.csi.k8s.io
+                readOnly: true
+                volumeAttributes:
+                  secretProviderClass: ghcr-pull-sync
+            - name: script
+              configMap:
+                name: ghcr-pull-sync-script
+                defaultMode: 0755
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ghcr-pull-secret-sync-once
+  namespace: am-apps-prod
+  labels:
+    app.kubernetes.io/name: ghcr-pull-sync
+  annotations:
+    am.asrax.in/run: "bootstrap"
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ghcr-pull-sync
+    spec:
+      serviceAccountName: am-backend-sa
+      restartPolicy: OnFailure
+      containers:
+        - name: sync
+          image: curlimages/curl:8.11.1
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "/scripts/sync.sh"]
+          volumeMounts:
+            - name: ghcr
+              mountPath: /mnt/ghcr
+              readOnly: true
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: ghcr
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: ghcr-pull-sync
+        - name: script
+          configMap:
+            name: ghcr-pull-sync-script
+            defaultMode: 0755

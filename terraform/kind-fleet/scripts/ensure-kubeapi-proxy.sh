@@ -19,19 +19,32 @@ esac
 
 ASRAX_HOME="${ASRAX_HOME:-${HOME:-/root}/.asrax}"
 KC_HOST=""
-for cand in \
-  "${ASRAX_HOME}/${KC_NAME}" \
-  "${ASRAX_HOME}/kubeconfig.${ENV_NAME}" \
-  "${ASRAX_HOME}/kubeconfig.dev"; do
-  if [[ -f "$cand" ]]; then
-    KC_HOST="$cand"
-    break
-  fi
-done
+# dig/dev: prefer host-only local kubeconfig (client-cert). Tunnel file cannot heal itself.
+if [[ "$ENV_NAME" == "dig" ]]; then
+  for cand in \
+    "${ASRAX_HOME}/kubeconfig.dev.local" \
+    "${ASRAX_HOME}/kubeconfig.dev"; do
+    if [[ -f "$cand" ]]; then
+      KC_HOST="$cand"
+      break
+    fi
+  done
+else
+  for cand in \
+    "${ASRAX_HOME}/${KC_NAME}" \
+    "${ASRAX_HOME}/kubeconfig.${ENV_NAME}" \
+    "${ASRAX_HOME}/kubeconfig.dev"; do
+    if [[ -f "$cand" ]]; then
+      KC_HOST="$cand"
+      break
+    fi
+  done
+fi
 if [[ -z "$KC_HOST" ]]; then
   echo "ERROR: no kubeconfig under ${ASRAX_HOME} for ${ENV_NAME}" >&2
   exit 1
 fi
+echo "using kubeconfig $KC_HOST"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOOP_SH="${SCRIPT_DIR}/kubeapi-proxy-ensure-loop.sh"

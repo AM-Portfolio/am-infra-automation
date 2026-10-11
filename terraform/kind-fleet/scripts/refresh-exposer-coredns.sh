@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Point Kind apps-cluster CoreDNS at live am-port-exposer for store/Temporal FQDNs.
+# Point Kind CoreDNS at live am-port-exposer for store/Temporal FQDNs.
+# Patches BOTH apps and infra clusters (Keycloak/Vault live on infra).
 # SoT for names: CoreDNS hosts plugin (refreshed here). Never bake 172.18.x into gitops.
 #
 # Usage:
@@ -49,20 +50,27 @@ case "$ENV_NAME" in
     ;;
 esac
 
-APPS_CP="am-${ENV_NAME}-apps-control-plane"
-SRC="$ASRAX_HOME/kubeconfig.am-${ENV_NAME}-apps.yaml"
-OUT="/tmp/kubeconfig.am-${ENV_NAME}-apps.coredns.yaml"
-if [[ ! -f "$SRC" ]]; then
-  echo "ERROR: missing kubeconfig $SRC" >&2
-  exit 1
-fi
-if ! docker inspect "$APPS_CP" >/dev/null 2>&1; then
-  echo "ERROR: missing Kind node $APPS_CP" >&2
-  exit 1
-fi
+HOSTS_LINE="$EXPOSER_IP ${HOSTS[*]}"
+export HOSTS_LINE ENV_NAME EXPOSER_IP
 
-CP_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' "$APPS_CP" | awk '{print $1}')
-python3 - "$SRC" "$CP_IP" "$OUT" <<'PY'
+patch_cluster() {
+  local role="$1" # apps|infra
+  local CP="am-${ENV_NAME}-${role}-control-plane"
+  local SRC="$ASRAX_HOME/kubeconfig.am-${ENV_NAME}-${role}.yaml"
+  local OUT="/tmp/kubeconfig.am-${ENV_NAME}-${role}.coredns.yaml"
+
+  if [[ ! -f "$SRC" ]]; then
+    echo "WARN: missing kubeconfig $SRC — skip ${role}"
+    return 0
+  fi
+  if ! docker inspect "$CP" >/dev/null 2>&1; then
+    echo "WARN: missing Kind node $CP — skip ${role}"
+    return 0
+  fi
+
+  local CP_IP
+  CP_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' "$CP" | awk '{print $1}')
+  python3 - "$SRC" "$CP_IP" "$OUT" <<'PY'
 import re, socket, sys
 src, ip, dst = sys.argv[1], sys.argv[2], sys.argv[3]
 t = open(src).read()
@@ -76,17 +84,15 @@ for port in (6443, 6444):
 else:
     raise SystemExit(f"no API for {ip}")
 PY
-export KUBECONFIG="$OUT"
-
-HOSTS_LINE="$EXPOSER_IP ${HOSTS[*]}"
-export HOSTS_LINE ENV_NAME EXPOSER_IP
-
-python3 <<'PY'
-import os, re, subprocess, sys, tempfile
+  export KUBECONFIG="$OUT"
+  echo "== CoreDNS exposer hosts on ${ENV_NAME}-${role} (exposer=$EXPOSER_IP) =="
+  CLUSTER_ROLE="$role" python3 <<'PY'
+import os, re, subprocess, sys, tempfile, json
 
 hosts_line = os.environ["HOSTS_LINE"]
 env = os.environ["ENV_NAME"]
 exposer = os.environ["EXPOSER_IP"]
+role = os.environ.get("CLUSTER_ROLE", "apps")
 marker_begin = f"# BEGIN am-exposer-hosts env={env}"
 marker_end = f"# END am-exposer-hosts env={env}"
 
@@ -95,9 +101,24 @@ def run(cmd, check=True, input=None):
     return r.stdout
 
 cm = run(["kubectl", "-n", "kube-system", "get", "configmap", "coredns", "-o", "json"])
-import json
 doc = json.loads(cm)
 corefile = doc["data"]["Corefile"]
+
+# One-line health { lameduck Ns } crashes CoreDNS — normalize before other edits.
+corefile = re.sub(
+    r"(?m)^([ \t]*)health[ \t]*\{[ \t]*lameduck[ \t]+([^}]+)\}[ \t]*$",
+    r"\1health {\n\1   lameduck \2\n\1}",
+    corefile,
+)
+
+# CoreDNS allows hosts only once per server block — strip markers + any hosts{} first.
+corefile = re.sub(
+    re.escape(marker_begin) + r".*?" + re.escape(marker_end) + r"\n?",
+    "",
+    corefile,
+    flags=re.DOTALL,
+)
+corefile = re.sub(r"(?m)^[ \t]*hosts\s*\{.*?^[ \t]*\}\n?", "", corefile, flags=re.DOTALL)
 
 block = f"""{marker_begin}
     hosts {{
@@ -106,24 +127,12 @@ block = f"""{marker_begin}
     }}
 {marker_end}"""
 
-pat = re.compile(
-    re.escape(marker_begin) + r".*?" + re.escape(marker_end),
-    re.DOTALL,
-)
+m = re.search(r"(^[ \t]*forward[ \t]+)", corefile, re.MULTILINE)
+if not m:
+    print(f"ERROR: no forward plugin in Corefile ({role})", file=sys.stderr)
+    sys.exit(1)
+new_core = corefile[: m.start()] + block + "\n    " + corefile[m.start() :]
 
-if pat.search(corefile):
-    new_core = pat.sub(block, corefile)
-else:
-    # Insert hosts plugin before the first "forward " in the main server block.
-    m = re.search(r"(^[ \t]*forward[ \t]+)", corefile, re.MULTILINE)
-    if not m:
-        print("ERROR: no forward plugin in Corefile to anchor hosts insert", file=sys.stderr)
-        sys.exit(1)
-    insert = block + "\n    "
-    new_core = corefile[: m.start()] + insert + corefile[m.start() :]
-
-# Pin upstream away from node /etc/resolv.conf (Docker bridge DNS / Tailscale MagicDNS
-# breaks public lookups → ImagePullBackOff). Public resolvers are IP-stable.
 dns1 = os.environ.get("AM_DOCKER_DNS1", "8.8.8.8")
 dns2 = os.environ.get("AM_DOCKER_DNS2", "8.8.4.4")
 fwd_pat = re.compile(
@@ -140,10 +149,9 @@ if fwd_n:
     new_core = new_core2
 
 if new_core == corefile:
-    print(f"coredns hosts+forward already ok exposer={exposer} env={env}")
+    print(f"coredns hosts+forward already ok exposer={exposer} env={env} role={role}")
     sys.exit(0)
 
-# Apply via kubectl patch of data.Corefile
 patch = json.dumps({"data": {"Corefile": new_core}})
 with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
     f.write(patch)
@@ -153,9 +161,13 @@ try:
 finally:
     os.unlink(path)
 
-print(f"patched kube-system/coredns hosts -> {exposer} ({env}); forward . {dns1} {dns2}")
-# Force reload (Kind CoreDNS reload may lag)
+print(f"patched kube-system/coredns hosts -> {exposer} ({env}/{role}); forward . {dns1} {dns2}")
 run(["kubectl", "-n", "kube-system", "rollout", "restart", "deployment/coredns"], check=False)
 run(["kubectl", "-n", "kube-system", "rollout", "status", "deployment/coredns", "--timeout=90s"], check=False)
-print(f"refresh-exposer-coredns done env={env} exposer={exposer}")
+print(f"refresh-exposer-coredns done env={env} role={role} exposer={exposer}")
 PY
+}
+
+patch_cluster apps
+patch_cluster infra
+echo "refresh-exposer-coredns ALL done env=$ENV_NAME exposer=$EXPOSER_IP"

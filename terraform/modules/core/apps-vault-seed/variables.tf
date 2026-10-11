@@ -14,10 +14,10 @@ terraform {
 
 variable "env" {
   type        = string
-  description = "Fleet env token (dev|prod|dr). Used in Vault paths and hostnames."
+  description = "Fleet env token (dev|preprod|prod|dr). Used in Vault paths and hostnames."
   validation {
-    condition     = contains(["dev", "prod", "dr"], var.env)
-    error_message = "env must be dev, prod, or dr."
+    condition     = contains(["dev", "preprod", "prod", "dr"], var.env)
+    error_message = "env must be dev, preprod, prod, or dr."
   }
 }
 
@@ -51,6 +51,12 @@ variable "influx_password" {
 variable "keycloak_realm" {
   type    = string
   default = "am-realm"
+}
+
+variable "keycloak_public_host" {
+  type        = string
+  default     = ""
+  description = "Override Keycloak hostname without scheme. Dig/preprod set auth.asrax.in (shared Contabo prod KC). DR leaves empty → auth-dr."
 }
 
 variable "keycloak_admin_user" {

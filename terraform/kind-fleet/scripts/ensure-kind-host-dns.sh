@@ -256,6 +256,13 @@ r = run(["kubectl", "-n", "kube-system", "get", "configmap", "coredns", "-o", "j
 doc = json.loads(r.stdout)
 core = doc["data"]["Corefile"]
 
+# One-line health { lameduck Ns } crashes CoreDNS — normalize before forward edit.
+core = re.sub(
+    r"(?m)^([ \t]*)health[ \t]*\{[ \t]*lameduck[ \t]+([^}]+)\}[ \t]*$",
+    r"\1health {\n\1   lameduck \2\n\1}",
+    core,
+)
+
 # Replace any "forward . ..." line (with optional trailing block) carefully:
 # Match: forward . SOMETHING { ... }  OR  forward . SOMETHING
 pat = re.compile(

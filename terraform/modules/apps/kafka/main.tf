@@ -46,14 +46,13 @@ locals {
   )
 
   # Kafka-UI sidebar: local cluster is this plane; peer is the other fleet broker.
-  # Contabo prod apps (Vault env=prod) → kafka.asrax.in. Dig Contabo apps share that
-  # broker with *.dev. topic prefixes (store_hosts=contabo_prod). Laptop dig plane is kafka-dev.
+  # Prod UI calls the dev broker "dev" (bootstrap kafka-dev.asrax.in).
   ui_local_name = var.ui_cluster_name != "" ? var.ui_cluster_name : (
-    var.environment == "prod" ? "prod" : "dig"
+    var.environment == "prod" ? "prod" : (var.environment == "dev" ? "dev" : var.environment)
   )
-  ui_peer_name = var.environment == "prod" ? "dig" : "prod"
-  ui_peer_bootstrap = var.environment == "prod" ? coalesce(var.ui_bootstrap_dig, "kafka-dev.asrax.in:9092") : coalesce(var.ui_bootstrap_prod, "kafka.asrax.in:9092")
-  ui_preprod_bootstrap = coalesce(var.ui_bootstrap_preprod, "kafka-preprod.asrax.in:9092")
+  ui_peer_name = var.environment == "prod" ? "dev" : "prod"
+  ui_peer_bootstrap = var.environment == "prod" ? coalesce(var.ui_bootstrap_dig, "kafka-dev.asrax.in:9094") : coalesce(var.ui_bootstrap_prod, "kafka.asrax.in:9092")
+  ui_preprod_bootstrap = coalesce(var.ui_bootstrap_preprod, "kafka-preprod.asrax.in:9095")
   ui_dr_bootstrap      = coalesce(var.ui_bootstrap_dr, "kafka-dr.asrax.in:9092")
 }
 
@@ -172,8 +171,33 @@ resource "kubernetes_stateful_set" "kafka" {
             value = "0"
           }
           env {
+            name  = "KAFKA_AUTO_CREATE_TOPICS_ENABLE"
+            value = "false"
+          }
+          env {
             name  = "CLUSTER_ID"
             value = "MkU3OEVBNTcwNTJENDM2Qk"
+          }
+          dynamic "env" {
+            for_each = var.enable_authorizer ? [1] : []
+            content {
+              name  = "KAFKA_AUTHORIZER_CLASS_NAME"
+              value = "org.apache.kafka.metadata.authorizer.StandardAuthorizer"
+            }
+          }
+          dynamic "env" {
+            for_each = var.enable_authorizer ? [1] : []
+            content {
+              name  = "KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND"
+              value = "false"
+            }
+          }
+          dynamic "env" {
+            for_each = var.enable_authorizer ? [1] : []
+            content {
+              name  = "KAFKA_SUPER_USERS"
+              value = "User:kafka-reconciler"
+            }
           }
           
           # Ensure persistent path is explicitly passed to Kafka

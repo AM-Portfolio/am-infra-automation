@@ -142,13 +142,14 @@ services:
     keys:
       AM_PORTFOLIO_CLIENT_ID: "am-portfolio"
       AM_PORTFOLIO_CLIENT_SECRET: null
-      DEMO_PORTFOLIO_ID: "00000000-0000-0000-0000-000000000001"
+      # Contabo prod/preprod live demo (Vault apps/data/prod/services/am-portfolio)
+      DEMO_PORTFOLIO_ID: "f969745c-f492-4b86-88ed-6588e9f28bb3"
 
   am-trade-management:
     keys:
       AM_TRADE_CLIENT_ID: "am-trade-management"
       AM_TRADE_CLIENT_SECRET: null
-      DEMO_PORTFOLIO_ID: "00000000-0000-0000-0000-000000000001"
+      DEMO_PORTFOLIO_ID: "f969745c-f492-4b86-88ed-6588e9f28bb3"
       AM_TRADE_JOURNAL_BASE_URL: "__UI_BASE__/trade"
 
   am-oms:
@@ -231,7 +232,7 @@ services:
     keys:
       AM_ANALYSIS_CLIENT_ID: "am-analysis"
       AM_ANALYSIS_CLIENT_SECRET: null
-      DEMO_PORTFOLIO_ID: "00000000-0000-0000-0000-000000000001"
+      DEMO_PORTFOLIO_ID: "f969745c-f492-4b86-88ed-6588e9f28bb3"
 
   am-subscription:
     keys:

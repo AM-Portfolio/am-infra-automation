@@ -24,9 +24,9 @@ variable "extra_service_data" {
 }
 
 variable "keycloak_realm" {
-  type    = string
-  default = "am-realm"
-  description = "Contabo dig SSO uses the single prod Keycloak realm (no dig issuer)."
+  type        = string
+  default     = "am-dev-realm"
+  description = "Realm on Contabo prod Keycloak (auth.asrax.in). No dig Keycloak pods."
 }
 
 variable "ui_base_url" {
@@ -178,6 +178,7 @@ module "seed" {
   influx_bucket           = try(local.stores["INFLUX_BUCKET_DEV"], try(local.stores["INFLUX_BUCKET"], "am_dev"))
   influx_password         = try(local.stores["INFLUX_PASSWORD"], local.dig_seed)
   keycloak_realm          = var.keycloak_realm
+  keycloak_public_host    = "auth.asrax.in"
   keycloak_admin_user     = try(local.kc["KEYCLOAK_ADMIN_USER"], try(local.kc["KC_ADMIN_USER"], "admin"))
   keycloak_admin_password = coalesce(
     try(local.kc["KEYCLOAK_ADMIN_PASSWORD"], ""),

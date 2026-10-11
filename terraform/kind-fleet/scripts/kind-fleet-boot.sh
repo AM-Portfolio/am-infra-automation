@@ -19,6 +19,13 @@ EXPOSER_NAME="${EXPOSER_NAME:-am-port-exposer}"
 
 echo "== kind-fleet-boot ENV=$ENV_NAME =="
 
+echo "== 0 ensure-kind-node-ready (inotify + docker restart NotReady Kind nodes) =="
+if [[ -f "$ROOT/ensure-kind-node-ready.sh" ]]; then
+  bash "$ROOT/ensure-kind-node-ready.sh" "$ENV_NAME" || echo "WARN: ensure-kind-node-ready failed (continue)"
+else
+  echo "WARN: missing ensure-kind-node-ready.sh"
+fi
+
 echo "== 1 ensure-port-exposer =="
 bash "$ROOT/ensure-port-exposer.sh" "$ENV_NAME"
 
@@ -49,6 +56,14 @@ if [[ -f "$ROOT/ensure-vault-k8s-apps-auth.sh" ]]; then
   bash "$ROOT/ensure-vault-k8s-apps-auth.sh" "$ENV_NAME" || echo "WARN: ensure-vault-k8s-apps-auth failed (continue)"
 else
   echo "WARN: missing ensure-vault-k8s-apps-auth.sh"
+fi
+
+echo "== 2d ensure-ghcr-pull-secrets (Vault apps/.../infra/ghcr → ghcr-creds CronJob) =="
+if [[ -f "$ROOT/ensure-ghcr-pull-secrets.sh" ]]; then
+  SEED_IF_MISSING="${SEED_IF_MISSING:-1}" bash "$ROOT/ensure-ghcr-pull-secrets.sh" "$ENV_NAME" \
+    || echo "WARN: ensure-ghcr-pull-secrets failed (continue)"
+else
+  echo "WARN: missing ensure-ghcr-pull-secrets.sh"
 fi
 
 echo "== 3 refresh-exposer-coredns =="

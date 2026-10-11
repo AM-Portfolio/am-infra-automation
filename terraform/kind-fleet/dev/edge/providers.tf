@@ -57,7 +57,7 @@ variable "enable_obs_access" {
 
 variable "keycloak_issuer_url" {
   type    = string
-  default = "https://auth-dev.asrax.in/realms/am-realm"
+  default = "https://auth.asrax.in/realms/am-dev-realm"
 }
 
 variable "keycloak_access_client_id" {

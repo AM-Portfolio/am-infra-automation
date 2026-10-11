@@ -6,7 +6,8 @@ locals {
   kubeapi_apps_cp     = "am-dev-apps-control-plane"
   kubeapi_manifest    = abspath("${path.module}/../../../modules/ops/kubeapi-proxy/kubeapi-proxy.yaml")
   kubeapi_loop        = abspath("${path.module}/../../scripts/kubeapi-proxy-ensure-loop.sh")
-  kubeapi_kc          = "${pathexpand("~")}/.asrax/kubeconfig.dev"
+  # Prefer host-only local kubeconfig; tunnel file cannot heal the API path.
+  kubeapi_kc          = fileexists("${pathexpand("~")}/.asrax/kubeconfig.dev.local") ? "${pathexpand("~")}/.asrax/kubeconfig.dev.local" : "${pathexpand("~")}/.asrax/kubeconfig.dev"
 }
 
 resource "null_resource" "kubeapi_proxy_ensure" {
@@ -26,7 +27,9 @@ resource "null_resource" "kubeapi_proxy_ensure" {
       $cp = '${local.kubeapi_apps_cp}'
       $manifest = (Resolve-Path '${replace(local.kubeapi_manifest, "'", "''")}').Path
       $loop = (Resolve-Path '${replace(local.kubeapi_loop, "'", "''")}').Path
-      $kc = $env:USERPROFILE + '\.asrax\kubeconfig.dev'
+      $kcLocal = $env:USERPROFILE + '\.asrax\kubeconfig.dev.local'
+      $kcTunnel = $env:USERPROFILE + '\.asrax\kubeconfig.dev'
+      $kc = if (Test-Path $kcLocal) { $kcLocal } else { $kcTunnel }
       if (-not (Test-Path $kc)) { throw "missing kubeconfig $kc" }
 
       $deadline = (Get-Date).AddMinutes(5)

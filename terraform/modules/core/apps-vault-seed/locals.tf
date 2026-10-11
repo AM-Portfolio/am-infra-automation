@@ -15,15 +15,24 @@ locals {
     (var.env == "prod" ? "mongo.${var.domain}" : "mongodb-${var.env}.${var.domain}")
   )
   redis_host = local.use_contabo_prod_stores ? "redis.${var.domain}" : "redis${local.host_suffix}.${var.domain}"
+  # Dev and preprod keep their own brokers even when other stores use Contabo prod hosts.
   kafka_host = (
-    local.use_contabo_prod_stores ? "kafka.${var.domain}:9092" : "kafka${local.host_suffix}.${var.domain}:9092"
+    var.env == "dev" ? "kafka-dev.${var.domain}:9094" :
+    var.env == "preprod" ? "kafka-preprod.${var.domain}:9095" :
+    var.env == "prod" ? "kafka.${var.domain}:9092" :
+    "kafka${local.host_suffix}.${var.domain}:9092"
   )
   influx_host = (
     local.use_contabo_prod_stores ? "influxdb.${var.domain}" :
     (var.env == "prod" ? "influx.${var.domain}" : "influxdb-${var.env}.${var.domain}")
   )
-  auth_host   = var.env == "prod" ? "auth.${var.domain}" : "auth-${var.env}.${var.domain}"
-  kc_host     = "https://${local.auth_host}"
+  # dig/preprod: Contabo prod Keycloak (set keycloak_public_host=auth.asrax.in).
+  # DR keeps its own auth-dr Keycloak. Prod uses bare auth.asrax.in.
+  auth_host = coalesce(
+    var.keycloak_public_host != "" ? var.keycloak_public_host : null,
+    var.env == "prod" ? "auth.${var.domain}" : "auth-${var.env}.${var.domain}"
+  )
+  kc_host = "https://${local.auth_host}"
   ui_base = coalesce(
     var.ui_base_url != "" ? var.ui_base_url : null,
     var.env == "prod" ? "https://am.${var.domain}" : "https://am-${var.env}.${var.domain}"
@@ -366,24 +375,23 @@ locals {
     } : {}
   )
 
-  # Contabo dig: keep PLAINTEXT empty auth until brokers have SASL — only set topic prefixes.
-  # Non-empty username here would make apps attempt JAAS against PLAINTEXT brokers.
-  infra_kafka = merge(
-    {
-      bootstrap_servers       = local.kafka_host
-      username                = ""
-      password                = ""
-      sasl_mechanism          = "PLAIN"
-      security_protocol       = "PLAINTEXT"
-      KAFKA_SASL_MECHANISM    = "PLAIN"
-      KAFKA_SECURITY_PROTOCOL = "PLAINTEXT"
-    },
-    local.dig_shared ? {
-      topic_prefix       = local.kafka_topic_prefix.market
-      KAFKA_TOPIC_PREFIX = local.kafka_topic_prefix.market
-      isolation_note     = "prefix_convention_until_sasl"
-    } : {}
+  # Dedicated broker per env. Catalog topic names have no prefix.
+  # Empty username on PLAINTEXT so apps do not attempt SASL.
+  schema_registry_url = (
+    var.env == "dev" ? "https://schema-registry-dev.${var.domain}" :
+    var.env == "preprod" ? "https://schema-registry-preprod.${var.domain}" :
+    "https://schema-registry.${var.domain}"
   )
+  infra_kafka = {
+    bootstrap_servers       = local.kafka_host
+    username                = ""
+    password                = ""
+    sasl_mechanism          = "PLAIN"
+    security_protocol       = "PLAINTEXT"
+    KAFKA_SASL_MECHANISM    = "PLAIN"
+    KAFKA_SECURITY_PROTOCOL = "PLAINTEXT"
+    schema_registry_url     = local.schema_registry_url
+  }
 
   infra_influxdb = {
     host            = local.influx_host

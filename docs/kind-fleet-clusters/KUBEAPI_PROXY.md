@@ -33,13 +33,15 @@ Same idea as `am-port-exposer`:
 
 | Healer | What | Survives Kind wipe? |
 |--------|------|---------------------|
-| Host Docker **`am-kubeapi-proxy-ensure`** (`--restart always`) | Waits for Kind API, `kubectl apply` proxy YAML if not Ready | **Yes** |
+| Host Docker **`am-kubeapi-proxy-ensure`** (`--restart always`) | Waits for Kind API; keeps **CoreDNS health block** valid; restarts cloudflared if DNS was down; `kubectl apply` proxy YAML if not Ready | **Yes** |
 | In-cluster **`infra/kubeapi-proxy-ensure`** | Loop: if `kubeapi-proxy` not ready → re-apply | No (wiped with cluster; host ensure restores) |
+
+**CoreDNS tripwire:** this CoreDNS build rejects one-line `health { lameduck 5s }` (`Wrong argument count … after '}'`). That CrashLoops CoreDNS → cluster DNS dies → `cloudflared` / `kubeapi-proxy` CrashLoop → Cloudflare **530** on `kubeapi-dev.asrax.in` and `am-dev.asrax.in`. The ensure loop rewrites to a multiline `health { … }` block and rolls CoreDNS + cloudflared. Same normalize runs in `refresh-exposer-coredns.sh` and `ensure-kind-host-dns.sh` so host patches cannot reintroduce the one-liner.
 
 Scripts:
 
 - `terraform/kind-fleet/scripts/ensure-kubeapi-proxy.sh` — start/recreate host container
-- `terraform/kind-fleet/scripts/kubeapi-proxy-ensure-loop.sh` — loop inside the container
+- `terraform/kind-fleet/scripts/kubeapi-proxy-ensure-loop.sh` — loop inside the container (proxy + CoreDNS health heal)
 - Manifests: `terraform/modules/ops/kubeapi-proxy/kubeapi-proxy.yaml` (+ `kubeapi-proxy-ensure.yaml`)
 - Dig TF host ensure: `terraform/kind-fleet/dev/apps/kubeapi-proxy-ensure.tf`
 - VPS boot: `kind-fleet-boot.sh` step `ensure-kubeapi-proxy`
