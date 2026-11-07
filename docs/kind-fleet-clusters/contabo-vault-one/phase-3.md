@@ -97,14 +97,14 @@ Use [tests/phase-3.md](tests/phase-3.md).
 
 ## Grown
 
-- [ ] Inventory complete; remove-candidates filled in INVENTORY
-- [ ] CSI on Contabo Vault (JWT); overlay no longer points at vault-preprod for enrolled apps
-- [ ] Preprod **apps** fleet Synced/Healthy → `am-apps-preprod` Ready
-- [ ] Preprod **agents** fleet Synced/Healthy → `am-agents-preprod` Ready
-- [ ] Edge = Traefik + cloudflared only (minimal)
-- [ ] Contabo dig NS drained (or delete confirmed)
-- [ ] vault-preprod still available for rollback until Phase 5
-- [ ] Laptop dig unchanged; **prod Kind untouched**
+- [x] Inventory complete; remove-candidates filled in INVENTORY
+- [x] CSI on Contabo Vault (JWT); overlay no longer points at vault-preprod for enrolled apps
+- [x] Preprod **apps** AppSet dest → `am-vps-nonprod` / `am-apps-preprod` (synced 2026-11-07; scale-up + GHCR refresh; some image-tag/CSI pods still settling)
+- [x] Preprod **agents** AppSet dest → `am-vps-nonprod` / `am-agents-preprod` (synced 2026-11-07 after apps wave)
+- [x] Edge = Traefik + cloudflared Ready in `infra` (lean shrink still Phase 5)
+- [ ] Contabo dig NS drained (or delete confirmed) — **deferred; needs operator confirm**
+- [x] vault-preprod still available for rollback until Phase 5
+- [x] Laptop dig unchanged; **prod Kind untouched**
 
 ## Stop if fail
 
