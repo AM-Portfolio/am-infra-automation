@@ -139,7 +139,7 @@ resource "kubernetes_deployment_v1" "cloudflared" {
     labels    = { app = "cloudflared" }
   }
   spec {
-    replicas = 1
+    replicas = 2
     selector {
       match_labels = { app = "cloudflared" }
     }
@@ -154,6 +154,9 @@ resource "kubernetes_deployment_v1" "cloudflared" {
           args = [
             "tunnel",
             "--no-autoupdate",
+            # Prefer HTTP/2 over QUIC — QUIC drops caused intermittent 502 for remote kubectl.
+            "--protocol",
+            "http2",
             "--metrics",
             "0.0.0.0:2000",
             "run",

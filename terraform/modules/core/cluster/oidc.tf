@@ -60,7 +60,7 @@ resource "null_resource" "oidc_apiserver_patch" {
         set -e
         f=/etc/kubernetes/manifests/kube-apiserver.yaml
         grep -q 'oidc-issuer-url' \"\$f\" && exit 0
-        sed -i '/- kube-apiserver/a\\    - --oidc-issuer-url=${ISSUER}\\n    - --oidc-client-id=${CLIENT}\\n    - --oidc-username-claim=email\\n    - --oidc-groups-claim=groups' \"\$f\"
+        sed -i '/- kube-apiserver/a\\    - --oidc-issuer-url=$${ISSUER}\\n    - --oidc-client-id=$${CLIENT}\\n    - --oidc-username-claim=email\\n    - --oidc-groups-claim=groups' \"\$f\"
       "
       echo oidc_apiserver_patched
     BASH

@@ -1,6 +1,7 @@
 # G25 — Vault CSI auth for apps+agents (Terraform).
 # Requires: vault-dev up, ~/.asrax/vault-dev-infra.json, docker (apps CP IP).
 # GHCR: prefer Docker Desktop credential helper (working), fallback credentials.env.
+# Pull secrets SoT = TF re-apply module.vault_csi_auth (incl. colocated preprod NS); do not kubectl-clone.
 
 locals {
   vault_keys_file      = pathexpand("~/.asrax/vault-dev-infra.json")
@@ -64,21 +65,28 @@ data "external" "apps_cp_ip" {
 module "vault_csi_auth" {
   source = "../../../modules/core/apps-vault-csi-auth"
 
-  env                   = local.env
-  apps_ns               = kubernetes_namespace.am_apps.metadata[0].name
-  agents_ns             = kubernetes_namespace.am_agents.metadata[0].name
-  kubernetes_host       = local.apps_api_host
+  env                    = local.env
+  apps_ns                = kubernetes_namespace.am_apps.metadata[0].name
+  agents_ns              = kubernetes_namespace.am_agents.metadata[0].name
+  kubernetes_host        = local.apps_api_host
   kubernetes_ca_cert_pem = local.cluster_ca_pem
-  auth_path             = module.naming.vault_auth_mount
-  role_name             = module.naming.vault_role
-  policy_name           = module.naming.vault_policy
-  ghcr_username         = local.ghcr_username
-  ghcr_token            = local.ghcr_token
-  create_pull_secrets   = local.has_ghcr_token
+  auth_path              = module.naming.vault_auth_mount
+  role_name              = module.naming.vault_role
+  policy_name            = module.naming.vault_policy
+  ghcr_username          = local.ghcr_username
+  ghcr_token             = local.ghcr_token
+  create_pull_secrets    = local.has_ghcr_token
+  # Colocated preprod NS on laptop Kind — same GHCR dockerconfig; Vault role stays am-apps-dev/am-agents-dev.
+  extra_pull_secret_namespaces = [
+    kubernetes_namespace.am_apps_preprod.metadata[0].name,
+    kubernetes_namespace.am_agents_preprod.metadata[0].name,
+  ]
 
   depends_on = [
     kubernetes_namespace.am_apps,
     kubernetes_namespace.am_agents,
+    kubernetes_namespace.am_apps_preprod,
+    kubernetes_namespace.am_agents_preprod,
   ]
 }
 
@@ -88,6 +96,10 @@ output "vault_csi_auth_path" {
 
 output "vault_csi_bound_namespaces" {
   value = module.vault_csi_auth.bound_namespaces
+}
+
+output "vault_csi_pull_secret_namespaces" {
+  value = module.vault_csi_auth.pull_secret_namespaces
 }
 
 output "vault_csi_pull_secrets" {

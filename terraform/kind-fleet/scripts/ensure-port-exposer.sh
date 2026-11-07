@@ -35,10 +35,30 @@ INFRA_CP="am-${ENV_NAME}-infra-control-plane"
 INFRA_W="am-${ENV_NAME}-infra-worker"
 APPS_CP="am-${ENV_NAME}-apps-control-plane"
 
+# Pick the infra Kind node where store NodePorts actually accept TCP.
+# After Docker restart / Local traffic policy, worker often has CLOSED NodePorts
+# while pods sit on the control-plane — socat to a closed backend yields
+# "connection closed" (TCP accept then RST) for mongo/redis clients.
+pick_store_node() {
+  local n ip
+  for n in "$INFRA_CP" "$INFRA_W"; do
+    docker inspect "$n" >/dev/null 2>&1 || continue
+    ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' "$n" | awk '{print $1}')
+    [[ -n "$ip" ]] || continue
+    # Prefer a node that has mongo+redis NodePorts open (canonical store pair).
+    if timeout 1 bash -c "echo >/dev/tcp/${ip}/30017" 2>/dev/null \
+      && timeout 1 bash -c "echo >/dev/tcp/${ip}/30379" 2>/dev/null; then
+      echo "$n"
+      return 0
+    fi
+  done
+  # Fallback: CP then worker
+  docker inspect "$INFRA_CP" >/dev/null 2>&1 && echo "$INFRA_CP" && return 0
+  echo "$INFRA_W"
+}
+
 if [[ "$ENV_NAME" == "prod" ]]; then
-  STORE_NODE="$INFRA_W"
-  # fall back to CP if worker missing
-  docker inspect "$STORE_NODE" >/dev/null 2>&1 || STORE_NODE="$INFRA_CP"
+  STORE_NODE="$(pick_store_node)"
   TEMPORAL_NODE="$INFRA_CP"
   RPC_ALIAS="temporal-rpc-prod.${DOMAIN}"
   ALIASES=(

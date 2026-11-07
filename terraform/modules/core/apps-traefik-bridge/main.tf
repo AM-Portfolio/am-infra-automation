@@ -1,5 +1,7 @@
 # Bridge apps-cluster Traefik (NodePort) into infra Traefik for product UI hosts.
 # Multi-host IngressRoute → Service/Endpoints pointing at apps Kind CP NodePort.
+# Post-restart: kind-fleet/scripts/refresh-cross-cluster-bridges.ps1|.sh
+# (Endpoints only store IPs; Docker DNS host is in label am.io/backend-host).
 
 terraform {
   required_providers {

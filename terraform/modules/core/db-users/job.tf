@@ -227,7 +227,10 @@ resource "kubernetes_job" "redis_users" {
           args = [
             join("\n", concat(
               ["set -eu"],
-              [for user, spec in var.redis_users : "redis-cli -h redis-master ACL SETUSER ${user} on >${spec.password} '~*' '+@all'"]
+              [
+                for user, spec in var.redis_users :
+                "redis-cli -h redis-master ACL SETUSER ${user} on >${spec.password} '${try(spec.key_prefix, "") != "" ? "~${spec.key_prefix}*" : "~*"}' '+@all' '-@dangerous'"
+              ]
             ))
           ]
         }
@@ -284,7 +287,16 @@ resource "kubernetes_job" "minio_users" {
                 "mc alias set local http://minio:9000 \"$MINIO_ROOT_USER\" \"$MINIO_ROOT_PASSWORD\"",
                 "mc mb --ignore-existing local/platform"
               ],
-              [for user, spec in var.minio_users : "mc admin user add local ${user} ${spec.password} || true"]
+              flatten([
+                for user, spec in var.minio_users : concat(
+                  ["mc admin user add local ${user} ${spec.password} || true"],
+                  try(spec.prefix, "") != "" ? [
+                    "printf '%s' '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:*\"],\"Resource\":[\"arn:aws:s3:::platform/${spec.prefix}*\",\"arn:aws:s3:::platform\"]}]}' >/tmp/pol-${user}.json",
+                    "mc admin policy create local ${user}-prefix /tmp/pol-${user}.json || mc admin policy add local ${user}-prefix /tmp/pol-${user}.json || true",
+                    "mc admin policy attach local ${user}-prefix --user ${user} || true"
+                  ] : []
+                )
+              ])
             ))
           ]
         }
@@ -294,4 +306,79 @@ resource "kubernetes_job" "minio_users" {
 
   wait_for_completion = true
   timeouts { create = "6m" }
+}
+
+# Kafka SCRAM + topic ACL (only when bootstrap set and users non-empty).
+# No-op friendly: brokers without SASL will fail the job — leave kafka_bootstrap="" until SASL on.
+resource "kubernetes_job" "kafka_users" {
+  count = local.use_job && var.kafka_bootstrap != "" && length(var.kafka_users) > 0 ? 1 : 0
+
+  metadata {
+    name      = "db-users-kafka"
+    namespace = var.namespace
+  }
+
+  spec {
+    backoff_limit              = 3
+    ttl_seconds_after_finished = 600
+    template {
+      metadata { labels = { app = "db-users-kafka" } }
+      spec {
+        restart_policy = "OnFailure"
+        node_selector  = { role = "infra" }
+        container {
+          name  = "kafka"
+          image = "bitnami/kafka:3.6"
+          command = ["/bin/bash", "-c"]
+          args = [
+            join("\n", concat(
+              [
+                "set -eu",
+                "BOOT=${var.kafka_bootstrap}",
+                "echo 'kafka SCRAM provision against '\"$BOOT\""
+              ],
+              [
+                for user, spec in var.kafka_users :
+                join("\n", [
+                  "kafka-configs.sh --bootstrap-server \"$BOOT\" --alter --add-config \"SCRAM-SHA-512=[password=${spec.password}]\" --entity-type users --entity-name ${user} || true",
+                  try(spec.topic_prefix, "") != "" ? "kafka-acls.sh --bootstrap-server \"$BOOT\" --add --allow-principal User:${user} --operation All --topic '${spec.topic_prefix}*' --resource-pattern-type prefixed || true" : "true"
+                ])
+              ]
+            ))
+          ]
+        }
+      }
+    }
+  }
+
+  wait_for_completion = false
+  timeouts { create = "3m" }
+}
+
+resource "kubernetes_config_map" "inventory" {
+  count = var.enable_inventory ? 1 : 0
+
+  metadata {
+    name      = "db-users-inventory"
+    namespace = var.namespace
+    labels = {
+      "app.kubernetes.io/name"       = "db-users-inventory"
+      "app.kubernetes.io/part-of"    = "am-access-plane"
+      "app.kubernetes.io/component"  = "inventory"
+    }
+  }
+
+  data = {
+    "postgresql_count" = tostring(length(var.postgresql_app_users))
+    "mongodb_count"    = tostring(length(var.mongodb_app_users))
+    "redis_count"      = tostring(length(var.redis_users))
+    "kafka_count"      = tostring(length(var.kafka_users))
+    "minio_count"      = tostring(length(var.minio_users))
+    "postgresql_users" = join(",", sort(keys(var.postgresql_app_users)))
+    "mongodb_users"    = join(",", sort(keys(var.mongodb_app_users)))
+    "redis_users"      = join(",", sort(keys(var.redis_users)))
+    "kafka_users"      = join(",", sort(keys(var.kafka_users)))
+    "minio_users"      = join(",", sort(keys(var.minio_users)))
+    "catalog_note"     = "passwords in TF state only until IAM-V"
+  }
 }

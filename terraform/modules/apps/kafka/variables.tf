@@ -75,3 +75,39 @@ variable "advertised_host" {
   type        = string
   default     = ""
 }
+
+variable "ui_cluster_name" {
+  description = "Optional override for kafka-ui local cluster[0] label. Empty = prod, or the environment name."
+  type        = string
+  default     = ""
+}
+
+variable "enable_authorizer" {
+  description = "Turn on KRaft StandardAuthorizer with allow.everyone.if.no.acl.found=false. Leave false until am-event-platform authorizer-readiness passes and SCRAM users exist. Default false keeps today's PLAINTEXT listener."
+  type        = bool
+  default     = false
+}
+
+variable "ui_bootstrap_prod" {
+  description = "Bootstrap for kafka-ui Contabo prod peer (used when this module is not env=prod)."
+  type        = string
+  default     = "kafka.asrax.in:9092"
+}
+
+variable "ui_bootstrap_dig" {
+  description = "Bootstrap for kafka-ui dig/laptop peer (used when this module is env=prod)."
+  type        = string
+  default     = "kafka-dev.asrax.in:9094"
+}
+
+variable "ui_bootstrap_preprod" {
+  description = "Bootstrap for kafka-ui preprod cluster."
+  type        = string
+  default     = "kafka-preprod.asrax.in:9095"
+}
+
+variable "ui_bootstrap_dr" {
+  description = "Bootstrap for kafka-ui dr cluster."
+  type        = string
+  default     = "kafka-dr.asrax.in:9092"
+}

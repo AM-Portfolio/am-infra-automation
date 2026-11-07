@@ -1,24 +1,13 @@
 # Seeds Contabo Vault apps/data/dev/* (vault.asrax.in) via apps-vault-seed.
-# Separate state from kind-fleet/dev/vault-apps (vault-dev).
-#
-# Contabo dig has NO separate dig Mongo/Redis/PG — store_hosts=contabo_prod
-# (postgres|mongo|redis.asrax.in). Cluster admin creds come from Contabo
-# apps/data/prod/infra/*; per-DB app users are dig-scoped (*_dev) with unique passwords.
-#
-# Track: docs/kind-fleet-clusters/contabo-vault-one/
-#
-#   cd terraform/kind-fleet
-#   .\init-backend.ps1 -Env dev -Role vault-apps-contabo
-#   terraform -chdir=dev/vault-apps-contabo init -backend-config=backend.hcl
-#   terraform -chdir=dev/vault-apps-contabo plan
-#   terraform -chdir=dev/vault-apps-contabo apply
+# IAM-4: does NOT copy Contabo prod admin passwords.
+# Dig principals use DIG_PRINCIPAL_SEED → dig_vault_seed + sha256-derived *_dev users.
+# Hosts remain Contabo prod FQDNs (store_hosts=contabo_prod) — dig has no separate store plane.
 #
 # Requires:
-#   ~/.asrax/vault-contabo-infra.json  { "root_token": "..." }
-#   OR -var="vault_token=..." / TF_VAR_vault_token
-#   ~/.asrax/credentials.d/dev-infra-stores.env
+#   ~/.asrax/vault-contabo-infra.json
+#   ~/.asrax/credentials.d/dig-principal-seed.env   DIG_PRINCIPAL_SEED=...
 #   ~/.asrax/credentials.d/keycloak-kind-fleet-dev.env (or keycloak-kind-nonprod.env)
-# Prefer Google/OIDC from preprod via terraform.tfvars extra_service_data (never commit secrets).
+# Optional: ~/.asrax/credentials.d/dev-infra-stores.env for Influx only
 
 variable "vault_token" {
   type        = string
@@ -35,8 +24,9 @@ variable "extra_service_data" {
 }
 
 variable "keycloak_realm" {
-  type    = string
-  default = "am-dev-realm"
+  type        = string
+  default     = "am-dev-realm"
+  description = "Realm on Contabo prod Keycloak (auth.asrax.in). No dig Keycloak pods."
 }
 
 variable "ui_base_url" {
@@ -44,11 +34,19 @@ variable "ui_base_url" {
   default = "https://am-dev.asrax.in"
 }
 
+variable "dig_principal_seed" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Override DIG_PRINCIPAL_SEED; else read dig-principal-seed.env."
+}
+
 locals {
   env    = "dev"
   domain = "asrax.in"
 
   vault_keys_file = pathexpand("~/.asrax/vault-contabo-infra.json")
+  seed_env_file   = pathexpand("~/.asrax/credentials.d/dig-principal-seed.env")
   stores_env_file = pathexpand("~/.asrax/credentials.d/dev-infra-stores.env")
   kc_env_file = (
     fileexists(pathexpand("~/.asrax/credentials.d/keycloak-kind-fleet-dev.env"))
@@ -68,7 +66,26 @@ locals {
     : var.vault_token
   )
 
-  stores_raw = replace(file(local.stores_env_file), "\ufeff", "")
+  seed_raw = fileexists(local.seed_env_file) ? replace(file(local.seed_env_file), "\ufeff", "") : ""
+  seed_lines = [
+    for l in split("\n", local.seed_raw) :
+    trimspace(replace(l, "\r", ""))
+    if length(trimspace(replace(l, "\r", ""))) > 0 && !startswith(trimspace(replace(l, "\r", "")), "#")
+  ]
+  seed_map = {
+    for l in local.seed_lines :
+    trimspace(split("=", l)[0]) => trim(
+      trimspace(join("=", slice(split("=", l), 1, length(split("=", l))))),
+      "\"'"
+    )
+  }
+  dig_seed = coalesce(
+    length(var.dig_principal_seed) >= 16 ? var.dig_principal_seed : null,
+    try(local.seed_map["DIG_PRINCIPAL_SEED"], ""),
+    ""
+  )
+
+  stores_raw = fileexists(local.stores_env_file) ? replace(file(local.stores_env_file), "\ufeff", "") : ""
   stores_lines = [
     for l in split("\n", local.stores_raw) :
     trimspace(replace(l, "\r", ""))
@@ -112,7 +129,17 @@ resource "terraform_data" "require_contabo_token" {
   lifecycle {
     precondition {
       condition     = length(local.vault_token_resolved) >= 8
-      error_message = "Missing Contabo Vault token: place ~/.asrax/vault-contabo-infra.json (root_token) or -var=vault_token=..."
+      error_message = "Missing Contabo Vault token: ~/.asrax/vault-contabo-infra.json or -var=vault_token=..."
+    }
+  }
+}
+
+resource "terraform_data" "require_dig_seed" {
+  input = local.dig_seed
+  lifecycle {
+    precondition {
+      condition     = length(local.dig_seed) >= 16
+      error_message = "IAM-4: set DIG_PRINCIPAL_SEED in ~/.asrax/credentials.d/dig-principal-seed.env (run provision-dig-contabo-users.ps1 first)."
     }
   }
 }
@@ -131,72 +158,27 @@ resource "terraform_data" "require_kc_admin_env" {
   }
 }
 
-# Contabo dig shares Contabo prod stores (no mongodb-dev / redis-dev plane).
-data "vault_kv_secret_v2" "contabo_prod_postgres" {
-  mount = "apps"
-  name  = "prod/infra/postgres"
-}
-
-data "vault_kv_secret_v2" "contabo_prod_mongodb" {
-  mount = "apps"
-  name  = "prod/infra/mongodb"
-}
-
-data "vault_kv_secret_v2" "contabo_prod_redis" {
-  mount = "apps"
-  name  = "prod/infra/redis"
-}
-
-locals {
-  contabo_pg_user = coalesce(
-    try(data.vault_kv_secret_v2.contabo_prod_postgres.data["POSTGRES_USER"], null),
-    try(data.vault_kv_secret_v2.contabo_prod_postgres.data["username"], null),
-    "postgres"
-  )
-  contabo_pg_password = coalesce(
-    try(data.vault_kv_secret_v2.contabo_prod_postgres.data["POSTGRES_PASSWORD"], null),
-    try(data.vault_kv_secret_v2.contabo_prod_postgres.data["password"], null),
-    ""
-  )
-  contabo_mongo_user = coalesce(
-    try(data.vault_kv_secret_v2.contabo_prod_mongodb.data["username"], null),
-    "admin"
-  )
-  contabo_mongo_password = try(data.vault_kv_secret_v2.contabo_prod_mongodb.data["password"], "")
-  contabo_redis_password = try(data.vault_kv_secret_v2.contabo_prod_redis.data["password"], "")
-}
-
-resource "terraform_data" "require_contabo_prod_store_creds" {
-  input = "${length(local.contabo_pg_password)}:${length(local.contabo_mongo_password)}:${length(local.contabo_redis_password)}"
-  lifecycle {
-    precondition {
-      condition = (
-        length(local.contabo_pg_password) >= 8 &&
-        length(local.contabo_mongo_password) >= 8 &&
-        length(local.contabo_redis_password) >= 8
-      )
-      error_message = "Contabo dig seed needs Contabo prod store passwords from apps/data/prod/infra/{postgres,mongodb,redis}."
-    }
-  }
-}
-
+# Dig Vault uses dig_vault_seed (+ derived *_dev passwords inside apps-vault-seed).
+# Never pull Contabo prod admin from apps/data/prod/infra/*.
 module "seed" {
   source = "../../../modules/core/apps-vault-seed"
 
   env                     = local.env
   domain                  = local.domain
   store_hosts             = "contabo_prod"
-  postgres_user           = local.contabo_pg_user
-  postgres_password       = local.contabo_pg_password
+  postgres_user           = "dig_vault_seed"
+  postgres_password       = local.dig_seed
   postgres_db             = try(local.stores["POSTGRES_DB"], "postgres")
-  mongo_user              = local.contabo_mongo_user
-  mongo_password          = local.contabo_mongo_password
-  redis_password          = local.contabo_redis_password
-  influx_token            = local.stores["INFLUX_TOKEN"]
-  influx_org              = local.stores["INFLUX_ORG"]
-  influx_bucket           = local.stores["INFLUX_BUCKET"]
-  influx_password         = try(local.stores["INFLUX_PASSWORD"], "")
+  mongo_user              = "dig_vault_seed"
+  mongo_password          = local.dig_seed
+  redis_password          = local.dig_seed
+  influx_token            = try(local.stores["INFLUX_TOKEN"], "${local.env}-fleet-influx-token")
+  influx_org              = try(local.stores["INFLUX_ORG"], "influxdata")
+  # Contabo dig → am_dev bucket (bidirectional isolation from prod bucket am)
+  influx_bucket           = try(local.stores["INFLUX_BUCKET_DEV"], try(local.stores["INFLUX_BUCKET"], "am_dev"))
+  influx_password         = try(local.stores["INFLUX_PASSWORD"], local.dig_seed)
   keycloak_realm          = var.keycloak_realm
+  keycloak_public_host    = "auth.asrax.in"
   keycloak_admin_user     = try(local.kc["KEYCLOAK_ADMIN_USER"], try(local.kc["KC_ADMIN_USER"], "admin"))
   keycloak_admin_password = coalesce(
     try(local.kc["KEYCLOAK_ADMIN_PASSWORD"], ""),
@@ -209,7 +191,7 @@ module "seed" {
   depends_on = [
     terraform_data.require_kc_admin_env,
     terraform_data.require_contabo_token,
-    terraform_data.require_contabo_prod_store_creds,
+    terraform_data.require_dig_seed,
   ]
 }
 
@@ -227,4 +209,8 @@ output "service_names" {
 
 output "service_count" {
   value = length(module.seed.service_names)
+}
+
+output "iam4_note" {
+  value = "Dig Vault uses dig_vault_seed + DIG_PRINCIPAL_SEED; Contabo prod admin no longer copied."
 }

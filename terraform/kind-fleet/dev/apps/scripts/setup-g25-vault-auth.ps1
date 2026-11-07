@@ -42,9 +42,13 @@ try {
     @("module.vault_csi_auth.kubernetes_cluster_role_binding_v1.vault_auth_reviewer", "vault-auth-reviewer-apps"),
     @("kubernetes_namespace.am_agents", "am-agents-dev"),
     @("kubernetes_namespace.am_apps", "am-apps-dev"),
+    @("kubernetes_namespace.am_apps_preprod", "am-apps-preprod"),
+    @("kubernetes_namespace.am_agents_preprod", "am-agents-preprod"),
     @("kubernetes_namespace.edge", "edge"),
     @("kubernetes_service_account.am_backend_sa", "am-apps-dev/am-backend-sa"),
-    @("kubernetes_service_account.am_backend_sa_agents", "am-agents-dev/am-backend-sa")
+    @("kubernetes_service_account.am_backend_sa_agents", "am-agents-dev/am-backend-sa"),
+    @("kubernetes_service_account.am_backend_sa_apps_preprod", "am-apps-preprod/am-backend-sa"),
+    @("kubernetes_service_account.am_backend_sa_agents_preprod", "am-agents-preprod/am-backend-sa")
   )
   foreach ($imp in $imports) {
     cmd /c ("terraform import -input=false " + $imp[0] + " " + $imp[1])
@@ -52,25 +56,33 @@ try {
   }
 
   # Pull secrets already managed after first apply; import with safe quoting if needed.
+  # Laptop Kind colocates preprod NS — same GHCR dockerconfig as am-apps-dev (Vault role stays dev-only).
   $secretPairs = @(
     "am-apps-dev.github-registry-secret",
     "am-apps-dev.regcred",
     "am-apps-dev.ghcr-creds",
     "am-agents-dev.github-registry-secret",
     "am-agents-dev.regcred",
-    "am-agents-dev.ghcr-creds"
+    "am-agents-dev.ghcr-creds",
+    "am-apps-preprod.github-registry-secret",
+    "am-apps-preprod.regcred",
+    "am-apps-preprod.ghcr-creds",
+    "am-agents-preprod.github-registry-secret",
+    "am-agents-preprod.regcred",
+    "am-agents-preprod.ghcr-creds"
   )
   foreach ($pair in $secretPairs) {
     $dot = $pair.IndexOf(".")
     $ns = $pair.Substring(0, $dot)
     $name = $pair.Substring($dot + 1)
-    $addr = 'module.vault_csi_auth.kubernetes_secret_v1.ghcr["' + $pair + '"]'
-    $cmd = 'terraform import -input=false ' + $addr + ' ' + $ns + '/' + $name
+    # Windows: keep literal quotes in the for_each key (cmd strips " unless escaped).
+    $cmd = 'terraform import -input=false module.vault_csi_auth.kubernetes_secret_v1.ghcr[\"' + $pair + '\"] ' + $ns + '/' + $name
     cmd /c $cmd
   }
 
   Write-Output "== terraform apply (G25 targets) =="
-  cmd /c "terraform apply -auto-approve -input=false -target=module.vault_csi_auth -target=kubernetes_service_account.am_backend_sa -target=kubernetes_service_account.am_backend_sa_agents"
+  # Pull secrets SoT = TF re-apply module.vault_csi_auth; do not kubectl-clone between NS.
+  cmd /c "terraform apply -auto-approve -input=false -target=module.vault_csi_auth -target=kubernetes_service_account.am_backend_sa -target=kubernetes_service_account.am_backend_sa_agents -target=kubernetes_service_account.am_backend_sa_apps_preprod -target=kubernetes_service_account.am_backend_sa_agents_preprod"
   if ($LASTEXITCODE -ne 0) {
     Write-Warning "targeted apply failed; full apply"
     cmd /c "terraform apply -auto-approve -input=false"

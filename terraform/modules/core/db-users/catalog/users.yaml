@@ -1,0 +1,160 @@
+# AM store principals catalog (IAM access plane).
+# Dig Contabo dig pilot creates these first; Contabo prod/DR use the same map.
+# Passwords live in TF state only until IAM-V (enable_vault_secrets=true).
+# User names: Mongo/PG/Redis/MinIO/Kafka principal id (underscores OK for engines).
+
+version: 1
+
+postgresql:
+  # Platform shared DB (schema isolation) + dedicated DBs
+  - name: keycloak
+    schemas: [keycloak]
+  - name: temporal
+    schemas: [temporal, temporal_visibility]
+  - name: lago
+    schemas: [lago]
+    database: lago
+    createdb: true
+  - name: n8n
+    schemas: [n8n]
+  - name: openproject
+    schemas: [openproject]
+  - name: litellm
+    schemas: [litellm]
+  - name: langfuse
+    schemas: [langfuse]
+  - name: am_subscription_user
+    database: am_subscription
+    createdb: true
+  - name: am_user_platform_user
+    database: user_platform
+    createdb: true
+  - name: am_asrax_corp
+    database: asrax_corp
+    createdb: true
+  - name: am_fin_agent
+    database: am_fin_agent
+    createdb: true
+  - name: am_engage
+    database: am_engage
+    createdb: true
+  - name: am_resume
+    database: am_resume
+    createdb: true
+  - name: bytebase
+    schemas: [bytebase]
+
+mongodb:
+  - name: growthbook
+    database: platform
+    role: readWrite
+  - name: am_oms
+    database: am_oms
+    role: readWrite
+  - name: am_notification
+    database: am_notification
+    role: readWrite
+  - name: am_news
+    database: am_news
+    role: readWrite
+  - name: am_portfolio
+    database: am_portfolio
+    role: readWrite
+  - name: am_trade_management
+    database: am_trade
+    role: readWrite
+  - name: am_analysis
+    database: am_analysis
+    role: readWrite
+  - name: am_logging
+    database: am_logging
+    role: readWrite
+  - name: am_asrax_corp
+    database: am_asrax_corp
+    role: readWrite
+  - name: am_mkt_agent
+    database: am_mkt_agent
+    role: readWrite
+  - name: am_engage
+    database: am_engage
+    role: readWrite
+  - name: am_support_agent
+    database: am_support_agent
+    role: readWrite
+  - name: am_mcp_server
+    database: am_mcp
+    role: readWrite
+  - name: am_db_agent
+    database: am_db_agent
+    role: readWrite
+  - name: am_tool_agent
+    database: am_tool_agent
+    role: readWrite
+  - name: am_qa_agent
+    database: am_qa_agent
+    role: readWrite
+  - name: am_fin_agent
+    database: am_fin_agent
+    role: readWrite
+  - name: am_doc_intelligence
+    database: am_doc_intel
+    role: readWrite
+
+redis:
+  - name: langfuse
+    key_prefix: "langfuse:"
+  - name: am_market_data
+    key_prefix: "am-market-data:"
+  - name: am_gateway
+    key_prefix: "am-gateway:"
+  - name: am_portfolio
+    key_prefix: "am-portfolio:"
+  - name: am_trade_management
+    key_prefix: "am-trade:"
+  - name: am_analysis
+    key_prefix: "am-analysis:"
+  - name: am_oms
+    key_prefix: "am-oms:"
+  - name: am_notification
+    key_prefix: "am-notification:"
+  - name: am_api_gateway
+    key_prefix: "am-api-gateway:"
+
+kafka:
+  # Inventory + optional SCRAM job when brokers enable SASL. Dig/Contabo often PLAINTEXT.
+  - name: am_market_data
+    topic_prefix: am.market.
+  - name: am_gateway
+    topic_prefix: am.gateway.
+  - name: am_oms
+    topic_prefix: am.oms.
+  - name: am_notification
+    topic_prefix: am.notification.
+  - name: am_portfolio
+    topic_prefix: am.portfolio.
+  - name: am_trade_management
+    topic_prefix: am.trade.
+  - name: am_doc_intelligence
+    topic_prefix: am.doc.
+  - name: am_mcp_server
+    topic_prefix: am.mcp.
+  - name: am_db_agent
+    topic_prefix: am.db-agent.
+  - name: am_tool_agent
+    topic_prefix: am.tool-agent.
+  - name: am_logging
+    topic_prefix: am.logging.
+
+minio:
+  - name: langfuse
+    prefix: langfuse/
+  - name: am_support_agent
+    prefix: support-agent/
+  - name: am_asrax_corp
+    prefix: corp-docs/
+  - name: am_doc_intelligence
+    prefix: doc-intel/
+  - name: am_engage
+    prefix: engage/
+  - name: am_resume
+    prefix: resume/

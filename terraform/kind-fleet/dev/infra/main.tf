@@ -7,7 +7,7 @@ module "cluster" {
   source          = "../../../modules/core/cluster"
   env             = "dev"
   cluster_role    = "infra"
-  oidc_issuer_url = "https://auth-dev.asrax.in/realms/am-realm"
+  oidc_issuer_url = "https://auth.asrax.in/realms/am-dev-realm"
   oidc_client_id  = "kubectl"
 }
 

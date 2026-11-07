@@ -1,0 +1,113 @@
+# In-cluster healer for kubeapi-proxy (paired with host Docker am-kubeapi-proxy-ensure).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubeapi-proxy-ensure
+  namespace: infra
+  labels:
+    app: kubeapi-proxy-ensure
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kubeapi-proxy-ensure
+  namespace: infra
+  labels:
+    app: kubeapi-proxy-ensure
+rules:
+- apiGroups: [""]
+  resources: [configmaps, services, pods, endpoints]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [apps]
+  resources: [deployments]
+  verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kubeapi-proxy-ensure
+  namespace: infra
+  labels:
+    app: kubeapi-proxy-ensure
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubeapi-proxy-ensure
+subjects:
+- kind: ServiceAccount
+  name: kubeapi-proxy-ensure
+  namespace: infra
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeapi-proxy-ensure-loop
+  namespace: infra
+  labels:
+    app: kubeapi-proxy-ensure
+data:
+  ensure.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    INTERVAL="${INTERVAL:-30}"
+    MANIFEST="/manifests/kubeapi-proxy.yaml"
+    echo "kubeapi-proxy-ensure started interval=${INTERVAL}s"
+    while true; do
+      ready="$(kubectl -n infra get deploy kubeapi-proxy -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+      if [[ "${ready:-0}" != "1" ]]; then
+        echo "$(date -u +%FT%TZ) proxy not ready (ready=${ready:-0}); applying"
+        kubectl apply -f "$MANIFEST" || true
+        kubectl -n infra rollout status deploy/kubeapi-proxy --timeout=60s || true
+      else
+        echo "$(date -u +%FT%TZ) kubeapi-proxy ready=1"
+      fi
+      sleep "$INTERVAL"
+    done
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeapi-proxy-ensure
+  namespace: infra
+  labels:
+    app: kubeapi-proxy-ensure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubeapi-proxy-ensure
+  template:
+    metadata:
+      labels:
+        app: kubeapi-proxy-ensure
+    spec:
+      serviceAccountName: kubeapi-proxy-ensure
+      containers:
+      - name: ensure
+        image: alpine/k8s:1.31.4
+        env:
+        - name: INTERVAL
+          value: "30"
+        command: ["/bin/bash", "/scripts/ensure.sh"]
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+        - name: manifests
+          mountPath: /manifests
+          readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+      volumes:
+      - name: scripts
+        configMap:
+          name: kubeapi-proxy-ensure-loop
+          defaultMode: 0755
+      - name: manifests
+        configMap:
+          name: kubeapi-proxy-ensure-manifest

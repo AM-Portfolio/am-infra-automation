@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hermes
+  namespace: infra
+  labels:
+    app.kubernetes.io/name: hermes
+    am.io/bridge: host-serve
+spec:
+  ports:
+    - name: api
+      port: 8642
+      targetPort: 8642
+      protocol: TCP
+    - name: dashboard
+      port: 9119
+      targetPort: 9119
+      protocol: TCP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: hermes
+  namespace: infra
+  labels:
+    app.kubernetes.io/name: hermes
+    am.io/bridge: host-serve
+subsets:
+  - addresses:
+      - ip: 172.18.0.1
+    ports:
+      - name: api
+        port: 8642
+        protocol: TCP
+      - name: dashboard
+        port: 9119
+        protocol: TCP
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hermes
+  namespace: infra
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`hermes.asrax.in`)
+      kind: Rule
+      priority: 8000
+      middlewares:
+        - name: force-https
+        - name: force-https-proto
+        - name: global-cors
+      services:
+        # Dashboard is the browser entry; API remains on :8642 via path if needed later
+        - name: hermes
+          port: 9119

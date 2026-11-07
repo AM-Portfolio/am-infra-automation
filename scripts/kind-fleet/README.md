@@ -22,6 +22,16 @@
 
 Wipe/reseed: `terraform/kind-fleet/*/apps/scripts/fresh-redeploy.ps1` applies **gitops from the repo checkout** + G25/vault-apps TF. Do not feed it Application JSON from `/tmp` or `_gitops-*.tgz`.
 
+## Cross-cluster HTTP bridges (post Docker restart)
+
+Kind node IPs drift; Endpoints cannot hold Docker DNS names. Central refresh (all envs):
+
+- `terraform/kind-fleet/scripts/refresh-cross-cluster-bridges.ps1|.sh`
+- Thin wrappers: `terraform/kind-fleet/{dev,prod,dr,preprod}/scripts/`
+- Contabo timer: `terraform/kind-fleet/scripts/systemd/` (see README there)
+
+Post-restart: **exposer** → Vault unseal → **refresh-cross-cluster-bridges** → warmup.
+
 ## Keep vs retired
 
 - **Keep:** `phase_gates/`, `_debug_*`, `_vault_*` (read probes), `_argo_*` / `_closout_verify*`, `_qa_*`, `_check_*`, `_status_*`, `_spc_dump.sh`

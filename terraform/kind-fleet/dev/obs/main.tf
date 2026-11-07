@@ -94,7 +94,9 @@ module "obs_stack" {
 }
 
 # Bridge Grafana + Loki into infra Traefik (same pattern as Keycloak/Argo).
-# backend_host = Docker DNS — IP resolved at apply; post-restart also run scripts/refresh-platform-bridges.ps1
+# backend_host = Docker DNS — IP resolved at apply; post-restart:
+#   kind-fleet/scripts/refresh-cross-cluster-bridges.ps1 -Env <env>
+#   (or kind-fleet/<env>/scripts/… thin wrapper; Contabo: .sh + systemd timer)
 module "route_grafana" {
   source = "../../../modules/core/cross-cluster-http"
   providers = {

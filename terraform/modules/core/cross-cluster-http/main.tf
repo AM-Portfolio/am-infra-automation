@@ -16,7 +16,7 @@ terraform {
 
 # Resolve Kind node IP via Docker DNS at every apply when backend_host is set.
 # Endpoints cannot store hostnames — only IPs — so post-restart must re-apply or
-# run kind-fleet/*/obs/scripts/refresh-platform-bridges.ps1.
+# run kind-fleet/scripts/refresh-cross-cluster-bridges.ps1|.sh (or env wrapper).
 data "external" "backend_ip" {
   count = var.backend_host != "" && var.backend_ip == "" ? 1 : 0
   program = ["PowerShell", "-NoProfile", "-Command", <<-PS

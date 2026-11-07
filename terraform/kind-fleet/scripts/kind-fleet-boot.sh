@@ -19,14 +19,51 @@ EXPOSER_NAME="${EXPOSER_NAME:-am-port-exposer}"
 
 echo "== kind-fleet-boot ENV=$ENV_NAME =="
 
+echo "== 0 ensure-kind-node-ready (inotify + docker restart NotReady Kind nodes) =="
+if [[ -f "$ROOT/ensure-kind-node-ready.sh" ]]; then
+  bash "$ROOT/ensure-kind-node-ready.sh" "$ENV_NAME" || echo "WARN: ensure-kind-node-ready failed (continue)"
+else
+  echo "WARN: missing ensure-kind-node-ready.sh"
+fi
+
 echo "== 1 ensure-port-exposer =="
 bash "$ROOT/ensure-port-exposer.sh" "$ENV_NAME"
+
+echo "== 1b ensure-kubeapi-proxy =="
+if [[ -x "$ROOT/ensure-kubeapi-proxy.sh" ]] || [[ -f "$ROOT/ensure-kubeapi-proxy.sh" ]]; then
+  bash "$ROOT/ensure-kubeapi-proxy.sh" "$ENV_NAME" || echo "WARN: kubeapi-proxy ensure failed (continue)"
+else
+  echo "WARN: missing ensure-kubeapi-proxy.sh"
+fi
 
 echo "== 2 refresh-cross-cluster-bridges =="
 if [[ -x "$ROOT/refresh-cross-cluster-bridges.sh" ]]; then
   bash "$ROOT/refresh-cross-cluster-bridges.sh" "$ENV_NAME" || echo "WARN: bridges refresh failed (continue)"
 else
   echo "WARN: missing refresh-cross-cluster-bridges.sh"
+fi
+
+echo "== 2b ensure-kind-host-dns (daemon.json + node resolv + CoreDNS upstream) =="
+if [[ -f "$ROOT/ensure-kind-host-dns.sh" ]]; then
+  # No --restart-docker on boot: nodes already up; patch resolv + CoreDNS in place.
+  bash "$ROOT/ensure-kind-host-dns.sh" "$ENV_NAME" || echo "WARN: ensure-kind-host-dns failed (continue)"
+else
+  echo "WARN: missing ensure-kind-host-dns.sh"
+fi
+
+echo "== 2c ensure-vault-k8s-apps-auth (G25 TokenReview host after Docker churn) =="
+if [[ -f "$ROOT/ensure-vault-k8s-apps-auth.sh" ]]; then
+  bash "$ROOT/ensure-vault-k8s-apps-auth.sh" "$ENV_NAME" || echo "WARN: ensure-vault-k8s-apps-auth failed (continue)"
+else
+  echo "WARN: missing ensure-vault-k8s-apps-auth.sh"
+fi
+
+echo "== 2d ensure-ghcr-pull-secrets (Vault apps/.../infra/ghcr → ghcr-creds CronJob) =="
+if [[ -f "$ROOT/ensure-ghcr-pull-secrets.sh" ]]; then
+  SEED_IF_MISSING="${SEED_IF_MISSING:-1}" bash "$ROOT/ensure-ghcr-pull-secrets.sh" "$ENV_NAME" \
+    || echo "WARN: ensure-ghcr-pull-secrets failed (continue)"
+else
+  echo "WARN: missing ensure-ghcr-pull-secrets.sh"
 fi
 
 echo "== 3 refresh-exposer-coredns =="

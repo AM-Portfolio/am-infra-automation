@@ -76,9 +76,23 @@ variable "extra_origin_ingress" {
   description = <<-EOT
     Additive map of full FQDN → origin URL for tunnel ingress (non-Traefik).
     Used by argo-kubeapi-patch consumers so kubeapi-*.asrax.in reaches Kind apiserver
-    without replacing existing Traefik rules. Example:
-      { "kubeapi-dev.asrax.in" = "https://host.docker.internal:6444" }
-    DNS for these hosts is owned by modules/ops/argo-kubeapi-patch (not this map).
+    without replacing existing Traefik rules.
+
+    Dev Contabo Approve: must be the in-cluster HTTP kubeapi-proxy (bearer survives CF):
+      { "kubeapi-dev.asrax.in" = "http://kubeapi-proxy.infra.svc.cluster.local:80" }
+    Pair with extra_origin_http_host_header = { "kubeapi-dev.asrax.in" = "kubernetes.default.svc" }.
+
+    Do NOT use https://kubernetes.default.svc or host.docker.internal:6444 — CF→HTTPS kube
+    returns 401 on Authorization: Bearer (Contabo Approve 500/401).
+  EOT
+  type        = map(string)
+  default     = {}
+}
+
+variable "extra_origin_http_host_header" {
+  description = <<-EOT
+    Optional Host header override per extra_origin_ingress hostname (cloudflared originRequest.httpHostHeader).
+    Required for kubeapi-proxy: { "kubeapi-dev.asrax.in" = "kubernetes.default.svc" }.
   EOT
   type        = map(string)
   default     = {}

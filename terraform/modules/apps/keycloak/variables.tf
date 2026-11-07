@@ -140,11 +140,23 @@ variable "realm_name" {
 variable "realm_roles" {
   type = list(string)
   # Canonical IAM roles (iam-sso). developer → am-ops; user → am-user.
+  # access-* / team-* appear in token `groups` claim (am-groups-from-roles mapper) for UI gates.
   default = [
     "am-admin",
     "am-ops",
     "am-viewer",
     "am-user",
+    "team-platform",
+    "team-data",
+    "team-apps",
+    "access-grafana-viewer",
+    "access-grafana-editor",
+    "access-grafana-admin",
+    "access-minio-read",
+    "access-minio-write",
+    "access-kafka-ui",
+    "access-bytebase-user",
+    "access-bytebase-dba",
   ]
 }
 

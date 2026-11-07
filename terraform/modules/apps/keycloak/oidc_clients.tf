@@ -26,6 +26,7 @@ locals {
       "langfuse",
       "traefik",
       "novu",
+      "bytebase",
     ] : name => name
   }
 
@@ -61,6 +62,7 @@ locals {
     "langfuse"      = "langfuse${local.domain_suffix}"
     "traefik"       = "traefik${local.domain_suffix}"
     "novu"          = "novu${local.domain_suffix}"
+    "bytebase"      = "bytebase${local.domain_suffix}"
   }
 }
 

@@ -11,12 +11,32 @@ resource "kubernetes_manifest" "middleware_global_cors_apps" {
       name      = module.naming.middleware_cors
       namespace = kubernetes_namespace.am_apps.metadata[0].name
     }
+    # Browsers reject ACAO "*" when credentials are true (Flutter web).
+    # Keep localhost + 127.0.0.1 for local flutter run (port 9000/3000).
     spec = {
       headers = {
-        accessControlAllowMethods    = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
-        accessControlAllowHeaders    = ["*"]
-        accessControlAllowOriginList = ["*"]
+        accessControlAllowMethods = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+        accessControlAllowHeaders = [
+          "Content-Type",
+          "Authorization",
+          "X-Requested-With",
+          "Accept",
+          "Origin",
+          "Idempotency-Key",
+          "X-Request-ID",
+          "X-Trace-ID",
+        ]
+        accessControlAllowOriginList = [
+          "http://localhost:3000",
+          "http://localhost:9000",
+          "http://127.0.0.1:3000",
+          "http://127.0.0.1:9000",
+          "https://am-dev.asrax.in",
+          "https://am-preprod.asrax.in",
+        ]
         accessControlAllowCredentials = true
+        accessControlMaxAge           = 100
+        addVaryHeader                 = true
       }
     }
   }
@@ -74,10 +94,28 @@ resource "kubernetes_manifest" "middleware_global_cors_agents" {
     }
     spec = {
       headers = {
-        accessControlAllowMethods    = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
-        accessControlAllowHeaders    = ["*"]
-        accessControlAllowOriginList = ["*"]
+        accessControlAllowMethods = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+        accessControlAllowHeaders = [
+          "Content-Type",
+          "Authorization",
+          "X-Requested-With",
+          "Accept",
+          "Origin",
+          "Idempotency-Key",
+          "X-Request-ID",
+          "X-Trace-ID",
+        ]
+        accessControlAllowOriginList = [
+          "http://localhost:3000",
+          "http://localhost:9000",
+          "http://127.0.0.1:3000",
+          "http://127.0.0.1:9000",
+          "https://am-dev.asrax.in",
+          "https://am-preprod.asrax.in",
+        ]
         accessControlAllowCredentials = true
+        accessControlMaxAge           = 100
+        addVaryHeader                 = true
       }
     }
   }

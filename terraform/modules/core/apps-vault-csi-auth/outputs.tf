@@ -14,6 +14,10 @@ output "bound_namespaces" {
   value = local.bound_namespaces
 }
 
+output "pull_secret_namespaces" {
+  value = local.pull_secret_namespaces
+}
+
 output "pull_secrets_created" {
   value = keys(kubernetes_secret_v1.ghcr)
 }

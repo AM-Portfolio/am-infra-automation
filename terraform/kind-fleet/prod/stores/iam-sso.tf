@@ -11,7 +11,7 @@ variable "oidc_client_secrets" {
 locals {
   oidc_issuer = "https://auth.asrax.in/realms/am-realm"
   oidc_sec = {
-    for k in ["minio", "vault-ui", "kafka-ui", "pgadmin", "mongo-express", "redis-ui", "influx-ui", "traefik"] :
+    for k in ["minio", "vault-ui", "kafka-ui", "pgadmin", "mongo-express", "redis-ui", "influx-ui", "traefik", "bytebase"] :
     k => try(var.oidc_client_secrets[k], "")
   }
 }
@@ -78,4 +78,20 @@ module "oauth2_redis_ui" {
   enable_gateway = true
 
   depends_on = [module.redis]
+}
+
+# Bytebase Community has no native Keycloak SSO — gate UI with oauth2-proxy (IAM-3).
+module "oauth2_bytebase" {
+  source         = "../../../modules/apps/oauth2-proxy"
+  count          = local.oidc_sec["bytebase"] != "" ? 1 : 0
+  name           = "bytebase"
+  namespace      = module.namespaces.infra_ns
+  issuer_url     = local.oidc_issuer
+  client_id      = "bytebase"
+  client_secret  = local.oidc_sec["bytebase"]
+  upstream       = "http://bytebase.${module.namespaces.infra_ns}.svc:80"
+  redirect_url   = "https://bytebase.${local.domain}/oauth2/callback"
+  host           = "bytebase.${local.domain}"
+  allowed_groups = ["access-bytebase-dba", "access-bytebase-user", "am-admin", "am-ops"]
+  enable_gateway = true
 }

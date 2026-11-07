@@ -24,11 +24,9 @@ resource "random_password" "influx" {
 }
 
 resource "random_password" "app_users" {
-  for_each = toset([
-    "keycloak", "temporal", "lago", "n8n", "openproject", "litellm", "langfuse", "growthbook"
-  ])
-  length  = 24
-  special = false
+  for_each = local.catalog_user_names
+  length   = 24
+  special  = false
 }
 
 resource "local_sensitive_file" "store_creds" {
@@ -57,11 +55,12 @@ resource "local_sensitive_file" "store_creds" {
     PG_USER_OPENPROJECT=${random_password.app_users["openproject"].result}
     PG_USER_LITELLM=${random_password.app_users["litellm"].result}
     PG_USER_LANGFUSE=${random_password.app_users["langfuse"].result}
-    PG_USER_AM_SUBSCRIPTION=${random_password.postgres.result}
-    PG_USER_AM_USER_PLATFORM=${random_password.postgres.result}
+    PG_USER_AM_SUBSCRIPTION=${random_password.app_users["am_subscription_user"].result}
+    PG_USER_AM_USER_PLATFORM=${random_password.app_users["am_user_platform_user"].result}
     MONGO_USER_GROWTHBOOK=${random_password.app_users["growthbook"].result}
     REDIS_USER_LANGFUSE=${random_password.app_users["langfuse"].result}
     MINIO_USER_LANGFUSE=${random_password.app_users["langfuse"].result}
+    # Full principal inventory: ConfigMap infra/db-users-inventory after db_users apply
   EOT
 }
 

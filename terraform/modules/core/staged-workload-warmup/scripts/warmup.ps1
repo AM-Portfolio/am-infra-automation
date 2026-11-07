@@ -225,10 +225,21 @@ $paths = Resolve-KubePaths -FleetEnv $Env
 $AppsKube = $paths.Apps
 $InfraKube = $paths.Infra
 $PlatKube = $paths.Platform
-$RefreshScript = Join-Path $FleetRoot "$Env\obs\scripts\refresh-platform-bridges.ps1"
+$RefreshScript = Join-Path $FleetRoot "scripts\refresh-cross-cluster-bridges.ps1"
 if (-not (Test-Path -LiteralPath $RefreshScript)) {
-  # fallback: any env's refresh under kind-fleet/*/obs/scripts
-  $alt = Get-ChildItem -Path $FleetRoot -Recurse -Filter "refresh-platform-bridges.ps1" -ErrorAction SilentlyContinue | Select-Object -First 1
+  $RefreshScript = Join-Path $FleetRoot "$Env\scripts\refresh-cross-cluster-bridges.ps1"
+}
+if (-not (Test-Path -LiteralPath $RefreshScript)) {
+  # compat: old obs path (shim → central)
+  $RefreshScript = Join-Path $FleetRoot "$Env\obs\scripts\refresh-platform-bridges.ps1"
+}
+if (-not (Test-Path -LiteralPath $RefreshScript)) {
+  $alt = Get-ChildItem -Path $FleetRoot -Recurse -Filter "refresh-cross-cluster-bridges.ps1" -ErrorAction SilentlyContinue |
+    Where-Object { $_.DirectoryName -match '[\\/]scripts$' -and $_.DirectoryName -notmatch '[\\/](dev|prod|dr|preprod)[\\/]scripts$' } |
+    Select-Object -First 1
+  if (-not $alt) {
+    $alt = Get-ChildItem -Path $FleetRoot -Recurse -Filter "refresh-platform-bridges.ps1" -ErrorAction SilentlyContinue | Select-Object -First 1
+  }
   if ($alt) { $RefreshScript = $alt.FullName }
 }
 

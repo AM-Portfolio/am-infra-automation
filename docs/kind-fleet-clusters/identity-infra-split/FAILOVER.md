@@ -15,7 +15,10 @@ Repo: **am-infra-automation**.
 | Switch | Workflow | Input | GH Environment | Effect |
 |--------|----------|-------|----------------|--------|
 | Prod Contabo ↔ DR | [Edge primary](../../../.github/workflows/edge-primary.yml) | `primary=prod\|dr` | `edge-prod` / `edge-dr` | Bare CNAMEs → prod or DR tunnel |
-| Preprod Contabo ↔ nonprod-dr | [Nonprod origin](../../../.github/workflows/nonprod-origin.yml) | `origin=vps\|local` | `nonprod-vps` / `nonprod-local` | KV `nonprod/origin` for Worker `am-nonprod-origin` |
+| All `*-dev` VPS ↔ laptop | [Nonprod fleet origin](../../../.github/workflows/nonprod-fleet-origin.yml) | `plane=dev` `origin=vps\|local` | `nonprod-vps` / `nonprod-local` | Bulk CNAME `*-dev` → preprod or dig tunnel |
+| Preprod VPS ↔ laptop | [Nonprod fleet origin](../../../.github/workflows/nonprod-fleet-origin.yml) (or legacy [Nonprod origin](../../../.github/workflows/nonprod-origin.yml)) | `plane=preprod` `origin=vps\|local` | `nonprod-vps` / `nonprod-local` | KV `nonprod/origin` + other `*-preprod` CNAMEs (not `am-preprod` Worker host) |
+
+**Visibility:** Grafana [Edge Traffic](https://grafana.asrax.in/d/edge-traffic) (`edge-traffic`) — all domains → site/tunnel + nonprod KV vs effective header.
 
 ### Environment secrets (am-infra-automation)
 
@@ -27,7 +30,7 @@ Repo: **am-infra-automation**.
 
 Create Environments `nonprod-vps` / `nonprod-local` (and reviewers) to match `edge-prod` / `edge-dr`. Never put kubeconfig in GitHub.
 
-Break-glass (laptop / MCP): `edge-primary.sh` / `nonprod-origin.sh` with a local token.
+Break-glass (laptop / MCP): `edge-primary.sh` / `nonprod-fleet-origin.sh` / `nonprod-origin.sh` with a local token.
 
 ## Switch edge primary (until CF LB subscribed)
 
