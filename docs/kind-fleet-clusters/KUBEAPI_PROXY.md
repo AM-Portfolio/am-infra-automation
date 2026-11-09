@@ -1,8 +1,8 @@
-# kubeapi-proxy (Contabo → laptop Kind)
+# kubeapi-proxy (Contabo → dig VPS Kind)
 
-Contabo main Argo talks to laptop Kind **`am-dev-apps`** through Cloudflare Tunnel hostname **`kubeapi-dev.asrax.in`**.
+Contabo main Argo talks to dig Kind **`am-dev-apps`** on Bluehost VPS **`am-vps-dev`** (`129.121.169.241`) through Cloudflare Tunnel hostname **`kubeapi-dev.asrax.in`**.
 
-Operator `~/.asrax/kubeconfig.dev` uses the **same** hostname (bearer token) so other laptops can kubectl without localhost Kind. Host-only break-glass: `~/.asrax/kubeconfig.dev.local` (`127.0.0.1:6444`). Rebuild: `python scripts/kind-fleet/refresh-kubeconfig-dev-tunnel.py`.
+Operator `~/.asrax/kubeconfig.dev` uses the **same** hostname (bearer token) so operator laptops can kubectl without SSH to the VPS. Host-only break-glass on the dig VPS: `kubeconfig.dev.local` (`127.0.0.1:6444`). Rebuild: `python scripts/kind-fleet/refresh-kubeconfig-dev-tunnel.py` (run against dig Kind / tunnel).
 
 **Never** point the tunnel at `https://kubernetes.default.svc` directly. Cloudflare / TLS termination breaks Kubernetes bearer auth → Contabo Approve **401 / 500 / 403** (`failed to discover server resources`).
 
@@ -12,18 +12,19 @@ Operator `~/.asrax/kubeconfig.dev` uses the **same** hostname (bearer token) so 
 Contabo Argo API
   → https://kubeapi-dev.asrax.in
   → Cloudflare Tunnel (asrax-dev)
-  → cloudflared on am-dev-apps
+  → cloudflared on dig VPS am-dev-apps
   → http://kubeapi-proxy.infra.svc.cluster.local:80   (HTTP nginx)
   → https://kubernetes.default.svc
 ```
 
 | Piece | SoT |
 |-------|-----|
+| Dig host | Bluehost `am-vps-dev` / `129.121.169.241` (not laptop) |
 | Proxy Deployment/Service | `terraform/modules/ops/kubeapi-proxy/` |
 | Dev TF | `terraform/kind-fleet/dev/apps/kubeapi-proxy.tf` |
 | Tunnel origin | dig/edge `kubeapi_kind_api_origin` → proxy URL + `httpHostHeader: kubernetes.default.svc` |
 | Contabo cluster secret | `cluster-am-dev-apps` server `https://kubeapi-dev.asrax.in` |
-| Env landing | **dev** + **preprod** apps both on `am-dev-apps` (see am-gitops `DEV_ON_CONTABO.md`) |
+| Env landing | **dev** on dig VPS `am-dev-apps`; **preprod** on Contabo `am-vps-nonprod` (see am-gitops `DEV_ON_CONTABO.md`) |
 
 nginx must keep long watches alive (`proxy_read_timeout 3600s`, buffering off) or Contabo returns **504**.
 

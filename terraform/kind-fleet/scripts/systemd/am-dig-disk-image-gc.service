@@ -1,0 +1,15 @@
+[Unit]
+Description=AM dig VPS: unused Docker/Kind image GC when disk >= 80%
+Documentation=file:///root/am-repos/am-infra-automation/terraform/kind-fleet/scripts/systemd/README.md
+# Host OS unit — not a container. Still useful when Docker/Kind is under disk pressure.
+After=local-fs.target
+Wants=docker.service
+
+[Service]
+Type=oneshot
+Environment=THRESHOLD_PCT=80
+Environment=DRY_RUN=0
+Environment=KIND_CLUSTER=am-dev-apps
+Environment=LOG_FILE=/var/log/am-dig-disk-image-gc.log
+ExecStart=/bin/bash /root/am-repos/am-infra-automation/terraform/kind-fleet/scripts/dig-disk-image-gc.sh
+Nice=10

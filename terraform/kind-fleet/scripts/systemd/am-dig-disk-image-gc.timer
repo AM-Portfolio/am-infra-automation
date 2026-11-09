@@ -1,0 +1,13 @@
+[Unit]
+Description=AM dig VPS: hourly unused image GC (disk threshold gate)
+Documentation=file:///root/am-repos/am-infra-automation/terraform/kind-fleet/scripts/systemd/README.md
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=1min
+Persistent=true
+Unit=am-dig-disk-image-gc.service
+
+[Install]
+WantedBy=timers.target
