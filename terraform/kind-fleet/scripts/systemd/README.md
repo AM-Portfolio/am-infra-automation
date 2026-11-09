@@ -10,6 +10,26 @@ Install the **same three units** on every Kind VPS (`prod`, `dr`, `preprod`). Se
 
 Do **not** install these on dig laptop Kind (`overlays/dev` refuses Contabo store pins).
 
+### Dig VPS only — disk image GC (host systemd)
+
+| Unit | Purpose |
+|------|---------|
+| `am-dig-disk-image-gc.timer` | Hourly on **am-vps-dev**: if Docker root disk ≥ 80% used, prune **unused** host + Kind (`crictl`) images |
+
+**Host OS only** (never a Docker/K8s CronJob). Script may call `docker`/`crictl`; the scheduler is systemd.
+
+```bash
+# On am-vps-dev as root — first verify
+REPO="${REPO:-/root/am-repos/am-infra-automation}"
+DRY_RUN=1 bash "$REPO/terraform/kind-fleet/scripts/systemd/install-dig-disk-image-gc.sh"
+# Live
+DRY_RUN=0 bash "$REPO/terraform/kind-fleet/scripts/systemd/install-dig-disk-image-gc.sh"
+systemctl list-timers | grep am-dig-disk-image-gc
+tail -f /var/log/am-dig-disk-image-gc.log
+```
+
+Safe: unused images only. Does **not** volume-prune, wipe PVCs, or scale apps.
+
 **SoT:** app env uses DNS names only (`redis.asrax.in`, `temporal-rpc-<env>.asrax.in`). **Never** bake `172.18.x` into gitops hostAliases — CoreDNS hosts plugin is refreshed by the timer.
 
 ## One-time install (root, Contabo prod example)

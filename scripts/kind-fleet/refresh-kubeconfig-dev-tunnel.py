@@ -119,24 +119,29 @@ def main() -> int:
         shutil.copy2(OUT, bak)
         print(f"backup {bak}")
 
+    # Single context: dev-apps (aligns with prod-apps / Argo dest am-dev-apps).
     tunnel_cfg = {
         "apiVersion": "v1",
         "kind": "Config",
         "preferences": {},
         "clusters": [
             {
-                "name": "kind-am-dev-apps",
+                "name": "am-dev-apps",
                 "cluster": {
                     "server": TUNNEL,
                     "insecure-skip-tls-verify": True,
                 },
             }
         ],
-        "users": [{"name": "kind-am-dev-apps", "user": {"token": token}}],
+        "users": [{"name": "am-dev-apps", "user": {"token": token}}],
         "contexts": [
             {
                 "name": "dev-apps",
-                "context": {"cluster": "kind-am-dev-apps", "user": "kind-am-dev-apps"},
+                "context": {
+                    "cluster": "am-dev-apps",
+                    "user": "am-dev-apps",
+                    "namespace": "am-apps-dev",
+                },
             }
         ],
         "current-context": "dev-apps",
