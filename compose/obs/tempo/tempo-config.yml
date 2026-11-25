@@ -1,4 +1,4 @@
-# Single-binary Tempo — local filesystem, 5d retention. No external DB.
+﻿# Single-binary Tempo â€” local filesystem, 5d retention. No external DB.
 server:
   http_listen_port: 3200
 
@@ -33,7 +33,7 @@ metrics_generator:
   registry:
     external_labels:
       source: tempo
-      environment: obs
+      environment: nonprod
   storage:
     path: /var/tempo/generator/wal
 

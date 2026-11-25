@@ -127,14 +127,36 @@ block = f"""{marker_begin}
     }}
 {marker_end}"""
 
+dns1 = os.environ.get("AM_DOCKER_DNS1", "8.8.8.8")
+dns2 = os.environ.get("AM_DOCKER_DNS2", "8.8.4.4")
+fwd_line = f"forward . {dns1} {dns2} {{\n       max_concurrent 1000\n    }}"
+
+# Heal missing forward (Kind/default sometimes loses it; old scripts exited and left DNS dead).
+if not re.search(r"(?m)^[ \t]*forward[ \t]+\.", corefile):
+    print(f"WARN: no forward in Corefile ({role}) — inserting {dns1}/{dns2}", file=sys.stderr)
+    if re.search(r"(?m)^[ \t]*cache[ \t]", corefile):
+        corefile = re.sub(
+            r"(?m)^([ \t]*)cache[ \t]",
+            rf"    {fwd_line}\n\1cache ",
+            corefile,
+            count=1,
+        )
+    elif re.search(r"(?m)^[ \t]*loop[ \t]*$", corefile):
+        corefile = re.sub(
+            r"(?m)^([ \t]*)loop[ \t]*$",
+            rf"    {fwd_line}\n\1loop",
+            corefile,
+            count=1,
+        )
+    else:
+        corefile = corefile.rstrip() + f"\n    {fwd_line}\n"
+
 m = re.search(r"(^[ \t]*forward[ \t]+)", corefile, re.MULTILINE)
 if not m:
-    print(f"ERROR: no forward plugin in Corefile ({role})", file=sys.stderr)
+    print(f"ERROR: still no forward plugin in Corefile ({role})", file=sys.stderr)
     sys.exit(1)
 new_core = corefile[: m.start()] + block + "\n    " + corefile[m.start() :]
 
-dns1 = os.environ.get("AM_DOCKER_DNS1", "8.8.8.8")
-dns2 = os.environ.get("AM_DOCKER_DNS2", "8.8.4.4")
 fwd_pat = re.compile(
     r"(^[ \t]*)forward[ \t]+\.[ \t]+[^\n{]*(?:\{[^{}]*\})?",
     re.MULTILINE,

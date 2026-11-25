@@ -1,0 +1,11 @@
+# Prod edge / API reachability probes (scraped by Prometheus on VPS2).
+# 401/403/404 = UP (auth gate or empty root). 405 + 5xx / connect fail = DOWN.
+modules:
+  http_edge:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200, 204, 301, 302, 303, 307, 308, 401, 403, 404]
+      follow_redirects: true
+      preferred_ip_protocol: "ip4"

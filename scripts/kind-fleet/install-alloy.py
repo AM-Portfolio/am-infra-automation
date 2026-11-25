@@ -19,8 +19,8 @@ VPS_BY_ENV = {
     "prod": ("vps-prod", "VPS_PROD", "203.174.22.129"),
     "dr": ("vps-dr", "VPS_DR", "129.121.128.131"),
     "preprod": ("vps-preprod", "VPS_PREPROD", "103.127.146.57"),
-    "dev": ("vps-dev", "VPS_DEV", "laptop"),
-    "obs": ("vps-obs", "VPS_OBS", "129.121.132.116"),
+    "nonprod": ("vps-nonprod", "VPS_NONPROD", "129.121.132.116"),
+    "dev": ("vps-dev", "VPS_DEV", "129.121.169.241"),
 }
 
 

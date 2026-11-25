@@ -1,8 +1,9 @@
 #!/bin/bash
 # Runs inside am-kubeapi-proxy-ensure (host Docker, --restart always).
 # Rewrites kubeconfig to Kind control-plane Docker DNS, then keeps kubeapi-proxy applied.
-# Also self-heals CoreDNS: one-line `health { lameduck Ns }` crashes CoreDNS → DNS down →
-# cloudflared/kubeapi-proxy CrashLoop → Cloudflare 530 on kubeapi-dev / am-dev.
+# Also self-heals CoreDNS:
+#   - one-line `health { lameduck Ns }` crashes CoreDNS
+#   - missing `forward .` → SERVFAIL → cloudflared CF 1033 / ImagePullBackOff
 set -euo pipefail
 
 INTERVAL="${INTERVAL:-30}"
@@ -18,41 +19,62 @@ rewrite_kc() {
   echo "kubeconfig -> https://${APPS_CP}:6443"
 }
 
-# CoreDNS rejects `health { lameduck 5s }` on one line — must be a braced block.
-ensure_coredns_health() {
-  local core new patchf ready_dns cf_ready
-  core="$(kubectl -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' 2>/dev/null || true)"
-  [[ -z "$core" ]] && return 0
-
-  # Already multiline health + lameduck → nothing to do (unless DNS still down below).
-  if printf '%s\n' "$core" | grep -qE '^[[:space:]]*health[[:space:]]*\{[[:space:]]*$' \
-    && printf '%s\n' "$core" | grep -qE '^[[:space:]]*lameduck[[:space:]]'; then
-    :
-  elif printf '%s\n' "$core" | grep -qE 'health[[:space:]]*\{[[:space:]]*lameduck'; then
-    new="$(printf '%s\n' "$core" | sed -E \
-      's/^([ \t]*)health[ \t]*\{[ \t]*lameduck[ \t]+([^}]+)\}[ \t]*$/\1health {\n\1   lameduck \2\n\1}/')"
-    if [[ "$new" != "$core" ]]; then
-      patchf="$(mktemp)"
-      if command -v python3 >/dev/null 2>&1; then
-        NEW_CORE="$new" python3 - <<'PY' >"$patchf"
+_patch_coredns() {
+  local new="$1" patchf
+  patchf="$(mktemp)"
+  if command -v python3 >/dev/null 2>&1; then
+    NEW_CORE="$new" python3 - <<'PY' >"$patchf"
 import json, os
 print(json.dumps({"data": {"Corefile": os.environ["NEW_CORE"]}}))
 PY
-      elif command -v jq >/dev/null 2>&1; then
-        jq -n --arg c "$new" '{data:{Corefile:$c}}' >"$patchf"
-      else
-        echo "$(date -u +%FT%TZ) WARN: no python3/jq — cannot patch CoreDNS health" >&2
-        rm -f "$patchf"
-        return 0
-      fi
-      echo "$(date -u +%FT%TZ) fixing CoreDNS one-line health{lameduck}"
-      kubectl -n kube-system patch cm coredns --type merge --patch-file "$patchf" || true
-      rm -f "$patchf"
-      kubectl -n kube-system rollout restart deploy/coredns || true
-      kubectl -n kube-system rollout status deploy/coredns --timeout=90s || true
-      # Tunnel pods need cluster DNS to resolve argotunnel.com
-      kubectl -n infra rollout restart deploy/cloudflared 2>/dev/null || true
+  elif command -v jq >/dev/null 2>&1; then
+    jq -n --arg c "$new" '{data:{Corefile:$c}}' >"$patchf"
+  else
+    echo "$(date -u +%FT%TZ) WARN: no python3/jq — cannot patch CoreDNS" >&2
+    rm -f "$patchf"
+    return 1
+  fi
+  kubectl -n kube-system patch cm coredns --type merge --patch-file "$patchf" || true
+  rm -f "$patchf"
+  kubectl -n kube-system rollout restart deploy/coredns || true
+  kubectl -n kube-system rollout status deploy/coredns --timeout=90s || true
+  kubectl -n infra rollout restart deploy/cloudflared 2>/dev/null || true
+  return 0
+}
+
+ensure_coredns_health() {
+  local core new ready_dns cf_ready
+  core="$(kubectl -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' 2>/dev/null || true)"
+  [[ -z "$core" ]] && return 0
+  new="$core"
+
+  # One-line health { lameduck Ns } → multiline block.
+  if ! { printf '%s\n' "$new" | grep -qE '^[[:space:]]*health[[:space:]]*\{[[:space:]]*$' \
+    && printf '%s\n' "$new" | grep -qE '^[[:space:]]*lameduck[[:space:]]'; }; then
+    if printf '%s\n' "$new" | grep -qE 'health[[:space:]]*\{[[:space:]]*lameduck'; then
+      new="$(printf '%s\n' "$new" | sed -E \
+        's/^([ \t]*)health[ \t]*\{[ \t]*lameduck[ \t]+([^}]+)\}[ \t]*$/\1health {\n\1   lameduck \2\n\1}/')"
     fi
+  fi
+
+  # Missing forward → insert public upstream (never leave CoreDNS without upstream).
+  if ! printf '%s\n' "$new" | grep -qE '^[[:space:]]*forward[[:space:]]+\.'; then
+    echo "$(date -u +%FT%TZ) CoreDNS missing forward — inserting 8.8.8.8/8.8.4.4"
+    if printf '%s\n' "$new" | grep -qE '^[[:space:]]*cache[[:space:]]'; then
+      new="$(printf '%s\n' "$new" | sed -E 's/^([ \t]*)cache[ \t]/    forward . 8.8.8.8 8.8.4.4 {\n       max_concurrent 1000\n    }\n\1cache /')"
+    elif printf '%s\n' "$new" | grep -qE '^[[:space:]]*loop[[:space:]]*$'; then
+      new="$(printf '%s\n' "$new" | sed -E 's/^([ \t]*)loop[[:space:]]*$/    forward . 8.8.8.8 8.8.4.4 {\n       max_concurrent 1000\n    }\n\1loop/')"
+    else
+      new="${new}
+    forward . 8.8.8.8 8.8.4.4 {
+       max_concurrent 1000
+    }"
+    fi
+  fi
+
+  if [[ "$new" != "$core" ]]; then
+    echo "$(date -u +%FT%TZ) patching CoreDNS Corefile (health/forward heal)"
+    _patch_coredns "$new" || true
   fi
 
   ready_dns="$(kubectl -n kube-system get deploy coredns -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"

@@ -1,4 +1,4 @@
-// Grafana Alloy — VPS2 Compose self-telemetry (environment=obs).
+﻿// Grafana Alloy - VPS2 Compose self-telemetry (environment=nonprod).
 // Docker logs to local Loki; hub scrapes live in prometheus.yml.
 
 logging {
@@ -23,11 +23,11 @@ discovery.relabel "containers" {
     target_label  = "stream"
   }
   rule {
-    replacement  = "vps-obs"
+    replacement  = "vps-nonprod"
     target_label = "vps"
   }
   rule {
-    replacement  = "VPS_OBS"
+    replacement  = "VPS_NONPROD"
     target_label = "vps_name"
   }
   rule {
@@ -35,11 +35,11 @@ discovery.relabel "containers" {
     target_label = "vps_ip"
   }
   rule {
-    replacement  = "obs"
+    replacement  = "nonprod"
     target_label = "environment"
   }
   rule {
-    replacement  = "am-obs"
+    replacement  = "am-obs-hub"
     target_label = "cluster"
   }
   rule {
@@ -52,11 +52,11 @@ loki.source.docker "containers" {
   host       = "unix:///var/run/docker.sock"
   targets    = discovery.relabel.containers.output
   labels     = {
-    vps         = "vps-obs",
-    vps_name    = "VPS_OBS",
+    vps         = "vps-nonprod",
+    vps_name    = "VPS_NONPROD",
     vps_ip      = "129.121.132.116",
-    environment = "obs",
-    cluster     = "am-obs",
+    environment = "nonprod",
+    cluster     = "am-obs-hub",
   }
   forward_to = [loki.write.local.receiver]
 }
@@ -66,10 +66,10 @@ loki.write "local" {
     url = "http://loki:3100/loki/api/v1/push"
   }
   external_labels = {
-    vps         = "vps-obs",
-    vps_name    = "VPS_OBS",
+    vps         = "vps-nonprod",
+    vps_name    = "VPS_NONPROD",
     vps_ip      = "129.121.132.116",
-    cluster     = "am-obs",
-    environment = "obs",
+    cluster     = "am-obs-hub",
+    environment = "nonprod",
   }
 }

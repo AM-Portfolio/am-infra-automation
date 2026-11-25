@@ -121,6 +121,51 @@ apply_daemon_json() {
   fi
 }
 
+# Public DNS (8.8.8.8) cannot resolve Kind peer hostnames (am-*-control-plane).
+# kube-proxy/kindnet talk to the apiserver via that name — inject peer IPs into /etc/hosts.
+patch_kind_node_peer_hosts() {
+  need_root
+  local nodes peer_block="" n ip
+  nodes=$(docker ps --format '{{.Names}}' | grep -E 'control-plane|worker' | sort || true)
+  if [[ -z "$nodes" ]]; then
+    return 0
+  fi
+  peer_block="# AM kind-peer-hosts begin"$'\n'
+  for n in $nodes; do
+    ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$n" 2>/dev/null || true)
+    if [[ -n "$ip" ]]; then
+      peer_block+="${ip} ${n}"$'\n'
+    fi
+  done
+  peer_block+="# AM kind-peer-hosts end"$'\n'
+  if [[ "$peer_block" != *$'\n'*[0-9]* ]]; then
+    echo "WARN: no Kind peer IPs for /etc/hosts"
+    return 0
+  fi
+  for n in $nodes; do
+    echo "--- patch peer hosts $n ---"
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      printf '%s' "$peer_block"
+      continue
+    fi
+    # Strip prior AM peer block, then append a fresh one (idempotent).
+    docker exec "$n" sh -c '
+      set -e
+      awk "
+        BEGIN { skip=0 }
+        /^# AM kind-peer-hosts begin$/ { skip=1; next }
+        /^# AM kind-peer-hosts end$/ { skip=0; next }
+        skip { next }
+        { print }
+      " /etc/hosts > /tmp/hosts.am
+      cat /tmp/hosts.am > /etc/hosts
+      rm -f /tmp/hosts.am
+    '
+    printf '%s' "$peer_block" | docker exec -i "$n" tee -a /etc/hosts >/dev/null
+    docker exec "$n" grep -A20 'AM kind-peer-hosts begin' /etc/hosts || true
+  done
+}
+
 patch_kind_node_resolv() {
   need_root
   local nodes
@@ -145,6 +190,9 @@ patch_kind_node_resolv() {
       echo "WARN: getent ghcr.io still failing on $n" >&2
     fi
   done
+  # Peer hostnames must survive public resolv — otherwise kube-proxy on workers
+  # cannot resolve am-*-control-plane → ClusterIP/DNS dies → Vault stays sealed.
+  patch_kind_node_peer_hosts
 }
 
 kubeconfig_for_cluster() {
@@ -277,8 +325,18 @@ def repl(m):
 
 new_core, n = pat.subn(repl, core, count=1)
 if n == 0:
-    print("ERROR: no forward plugin found in Corefile", file=sys.stderr)
-    sys.exit(1)
+    # Insert forward before cache/loop — never leave CoreDNS without upstream (CF 1033 / ImagePullBackOff).
+    print(f"WARN: no forward in Corefile — inserting {want}", file=sys.stderr)
+    fwd_block = f"    forward . {d1} {d2} {{\n       max_concurrent 1000\n    }}"
+    if re.search(r"(?m)^[ \t]*cache[ \t]", core):
+        new_core = re.sub(r"(?m)^([ \t]*)cache[ \t]", fwd_block + r"\n\1cache ", core, count=1)
+    elif re.search(r"(?m)^[ \t]*loop[ \t]*$", core):
+        new_core = re.sub(r"(?m)^([ \t]*)loop[ \t]*$", fwd_block + r"\n\1loop", core, count=1)
+    else:
+        new_core = core.rstrip() + "\n" + fwd_block + "\n"
+    if not re.search(r"(?m)^[ \t]*forward[ \t]+\.", new_core):
+        print("ERROR: failed to insert forward plugin", file=sys.stderr)
+        sys.exit(1)
 
 if new_core == core and want in core:
     print(f"coredns forward already {want}")

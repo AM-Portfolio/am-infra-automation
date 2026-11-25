@@ -129,7 +129,7 @@ services:
           sleep 21600
         done
 
-  # Phase 6 — hub self-telemetry (Docker logs → local Loki; labels environment=obs).
+  # Phase 6 — hub self-telemetry (Docker logs → local Loki; labels environment=nonprod).
   alloy:
     image: grafana/alloy:v1.7.1
     restart: unless-stopped
@@ -171,7 +171,7 @@ services:
     expose:
       - "8080"
 
-  # Host disk/CPU for Platform Overview Storage glance (vps-obs).
+  # Host disk/CPU for Platform Overview Storage glance (vps-nonprod).
   node-exporter:
     image: prom/node-exporter:v1.8.2
     restart: unless-stopped
@@ -202,3 +202,71 @@ services:
       - ./prometheus/am_vps_info:/srv:ro
     expose:
       - "9100"
+
+  # Prod edge / API synthetic probes → Prometheus (probe_success, status codes).
+  blackbox:
+    image: prom/blackbox-exporter:v0.25.0
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: "0.1"
+    networks: [am-obs]
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    expose:
+      - "9115"
+
+  # Grafana → Zoho Cliq relay (prod critical/high). Dev stays UI-only via policy.
+  # Slim stdlib relay (no GHCR auth / no DB). See ./cliq-relay/relay.py.
+  # disableResolveMessage=false on email-and-cliq / cliq-only so RESOLVED cards fire too.
+  cliq-relay:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: "0.1"
+    networks: [am-obs]
+    working_dir: /srv
+    command: ["python", "/srv/relay.py"]
+    env_file:
+      - path: /data/am-state/obs/secrets/cliq-relay.env
+        required: true
+    environment:
+      GRAFANA_EXTERNAL_URL: https://grafana.asrax.in
+      ALERT_OPS_UI_BASE: https://grafana.asrax.in
+      CLIQ_RELAY_LISTEN: 0.0.0.0:8080
+    volumes:
+      - ./cliq-relay/relay.py:/srv/relay.py:ro
+    expose:
+      - "8080"
+
+  # Daily 09:00 Asia/Kolkata prod user landings → Cliq (new vs existing anon devices).
+  users-digest:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: "0.2"
+    networks: [am-obs]
+    working_dir: /srv
+    # tzdata required for zoneinfo Asia/Kolkata on Alpine.
+    command:
+      - sh
+      - -c
+      - apk add --no-cache tzdata >/dev/null && exec python /srv/scheduler.py
+    env_file:
+      - path: /data/am-state/obs/secrets/cliq-relay.env
+        required: true
+    environment:
+      LOKI_URL: http://loki:3100
+      GRAFANA_EXTERNAL_URL: https://grafana.asrax.in
+      DIGEST_ENV: prod
+      DIGEST_TZ: Asia/Kolkata
+      DIGEST_HOUR: "9"
+      DIGEST_MINUTE: "0"
+      DIGEST_NEW_LOOKBACK_DAYS: "7"
+      DIGEST_SCRIPT: /srv/digest.py
+    volumes:
+      - ./users-digest/digest.py:/srv/digest.py:ro
+      - ./users-digest/scheduler.py:/srv/scheduler.py:ro
+    depends_on: [loki]
+

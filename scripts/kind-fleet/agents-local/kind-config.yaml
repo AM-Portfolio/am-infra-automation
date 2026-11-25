@@ -1,0 +1,31 @@
+# Kind cluster for dig/dev agents fallback (laptop Docker).
+# Use NodePorts 30080/30443 (not hostPort 80/443) — Windows Docker often fails
+# kubeadm bootstrap when binding privileged host ports into the node.
+# ensure-agents-local-kind maps Traefik Service NodePorts; optional docker
+# publish proxy binds 127.0.0.1:80/443 → those NodePorts for am-dev.asrax.in.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: am-agents-local
+# kindest/node:v1.37.x fails kubeadm bootstrap on some Windows Docker hosts;
+# pin a known-good 1.29 image (override with KIND_NODE_IMAGE).
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 80
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+      - containerPort: 30443
+        hostPort: 443
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+      - containerPort: 8150
+        hostPort: 8150
+        listenAddress: "127.0.0.1"
+        protocol: TCP
